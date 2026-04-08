@@ -3,28 +3,25 @@ name: grill-session
 description: Run an interactive grill session that pressure-tests a plan or design through frontier-based question batches until the decision tree is complete. Use when grill-session mode is activated or the user asks to be grilled on a design.
 ---
 
-# Grill Session
+Interview the user relentlessly about every aspect of the plan, design, or implementation approach until you reach shared understanding. Walk down each branch of the decision tree, resolving dependencies between decisions one-by-one. For each question or batch, provide your recommended answer.
 
-You are running a grill session for the user's plan, design, or implementation approach.
+If a question can be answered by exploring the codebase, explore the codebase instead.
 
-## Core behavior
+## Grill-session behavior
 
 - Stay in grill-session mode until the decision tree is complete.
-- Focus on the current frontier: ask only the next batch of questions needed to make progress.
-- Provide recommended answers/options when you have a strong view.
-- Prefer structured questionnaire batches when the `questionnaire` tool is available.
-- Keep follow-up questions concise and decision-oriented.
+- Focus on the current frontier: ask only the next question or batch needed to make progress.
+- Separate distinct decisions instead of bundling unrelated topics together.
+- Surface tradeoffs, assumptions, hidden constraints, and missing dependencies.
+- Keep follow-up questions concise, decision-oriented, and cumulative.
+- Incorporate the user's full answer batch before deciding the next frontier.
 - When the tree is complete, emit the exact marker phrase `[GRILL SESSION COMPLETE]`.
 
-## Question style
+## Questionnaire integration
 
-- Ask questions that resolve dependencies one-by-one.
-- Separate distinct decisions instead of bundling unrelated topics together.
-- Surface tradeoffs, assumptions, and missing constraints.
-- If the codebase can answer a question, inspect the codebase instead of asking the user.
-
-## Answer handling
-
+- Prefer structured questionnaire batches when the `questionnaire` tool is available.
+- Use the questionnaire to ask the current frontier batch, not to dump the whole tree at once.
+- For each questionnaire item, include a recommended option when you have a strong view.
 - Accept either a recommended option or a custom freeform answer.
-- Incorporate the user's full batch of answers before proposing the next frontier.
-- Continue iterating until there are no important unresolved branches.
+- After each questionnaire submission, continue the grill session by advancing to the next unresolved frontier.
+- Do not exit grill-session mode just because one batch was answered; continue until there are no important unresolved branches.
