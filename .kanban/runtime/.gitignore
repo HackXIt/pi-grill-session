@@ -1,0 +1,6 @@
+*
+!.gitignore
+!sessions/
+!state/
+!logs/
+!recovery/
