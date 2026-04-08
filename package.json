@@ -1,0 +1,19 @@
+{
+  "name": "pi-grill-session",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Interactive grill-session extension for pi",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  }
+}
