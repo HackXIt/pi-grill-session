@@ -1,0 +1,7 @@
+.gitlab-ci.yml
+.kanban/
+.plans/
+docs/
+test/
+node_modules/
+*.tgz

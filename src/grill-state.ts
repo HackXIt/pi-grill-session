@@ -10,6 +10,7 @@ interface CustomEntry {
 	type: string;
 	customType?: string;
 	data?: unknown;
+	message?: unknown;
 }
 
 export const GRILL_SESSION_STATE_ENTRY = "grill-session-state";

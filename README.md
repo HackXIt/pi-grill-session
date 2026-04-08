@@ -2,23 +2,29 @@
 
 Interactive grill-session extension for pi.
 
-## Current status
+## Install as a pi package
 
-This repository currently contains the initial extension skeleton, test harness, kanban plan, and architecture documents.
+From GitHub:
 
-## Load locally in pi
+```bash
+pi install git:github.com/HackXIt/pi-grill-session
+```
 
-During development, load directly from the repo path:
+Or test it without installing permanently:
+
+```bash
+pi -e git:github.com/HackXIt/pi-grill-session
+```
+
+## Load locally during development
 
 ```bash
 pi --extension /home/hackxit/git-stash/pi-grill-session/src/index.ts
 ```
 
-Or add it to pi package/extension configuration later.
-
 ## Commands
 
-Current skeleton commands:
+Current commands:
 
 - `/grill`
 - `/grill-end`
@@ -31,11 +37,21 @@ Install dependencies:
 npm install
 ```
 
-Run tests:
+Run checks:
 
 ```bash
 npm test
+npm run typecheck
+npm run package:check
 ```
+
+## CI
+
+CI validates:
+
+- `npm test`
+- `npm run typecheck`
+- `npm pack`
 
 ## Planning and execution
 

@@ -1,0 +1,33 @@
+image: node:24
+
+stages:
+  - test
+  - package
+
+cache:
+  key:
+    files:
+      - package-lock.json
+  paths:
+    - .npm/
+
+variables:
+  npm_config_cache: "$CI_PROJECT_DIR/.npm"
+
+before_script:
+  - npm ci
+
+test:
+  stage: test
+  script:
+    - npm test
+    - npm run typecheck
+
+package:
+  stage: package
+  script:
+    - npm pack
+  artifacts:
+    paths:
+      - "*.tgz"
+    expire_in: 7 days

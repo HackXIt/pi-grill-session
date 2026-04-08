@@ -1,13 +1,27 @@
 {
-  "name": "pi-grill-session",
+  "name": "@hackxit/pi-grill-session",
   "version": "0.1.0",
+  "description": "Interactive grill-session extension for pi",
+  "keywords": ["pi-package"],
+  "license": "UNLICENSED",
   "private": true,
   "type": "module",
-  "description": "Interactive grill-session extension for pi",
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "ci": "npm test && npm run typecheck",
+    "package:check": "npm pack --dry-run"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*",
+    "@sinclair/typebox": "*"
   },
   "devDependencies": {
+    "@mariozechner/pi-coding-agent": "^0.66.1",
+    "@mariozechner/pi-tui": "^0.66.1",
+    "@sinclair/typebox": "^0.34.49",
+    "@types/node": "^24.5.2",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   },
