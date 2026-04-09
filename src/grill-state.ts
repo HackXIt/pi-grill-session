@@ -68,6 +68,9 @@ export function getActiveGrillSessionInstruction(): string {
 	return [
 		"The grill session is active.",
 		"Stay in grill-session questioning mode until the decision tree is complete.",
-		"Use concise frontier-based follow-up batches and emit [GRILL SESSION COMPLETE] when finished.",
+		"Ask only the current frontier batch needed to make progress.",
+		"When the questionnaire tool is available, use the questionnaire for the current frontier batch.",
+		"Prefer the questionnaire tool over plain-text questioning whenever it can capture the user's answer batch.",
+		"Continue batch-by-batch until the important unresolved branches are complete, then emit [GRILL SESSION COMPLETE].",
 	].join(" ");
 }

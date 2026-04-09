@@ -44,9 +44,15 @@ describe("grill session state", () => {
 		});
 	});
 
-	it("exports the shared completion contract and per-turn active-session instruction", () => {
+	it("exports the shared completion contract and a questionnaire-first active-session instruction", () => {
 		expect(GRILL_SESSION_COMPLETION_TOOL).toBe("complete_grill_session");
 		expect(GRILL_SESSION_COMPLETION_MARKER).toBe("[GRILL SESSION COMPLETE]");
-		expect(getActiveGrillSessionInstruction()).toContain("grill session");
+
+		const instruction = getActiveGrillSessionInstruction();
+		expect(instruction).toContain("grill session");
+		expect(instruction).toContain("questionnaire");
+		expect(instruction).toContain("Prefer the questionnaire tool over plain-text questioning");
+		expect(instruction).toContain("current frontier batch");
+		expect(instruction).toContain("[GRILL SESSION COMPLETE]");
 	});
 });
