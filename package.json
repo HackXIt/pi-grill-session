@@ -11,8 +11,8 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "ci": "npm test && npm run typecheck",
-    "package:check": "npm pack --dry-run"
+    "smoke:pi": "node ./scripts/smoke-pi-runtime.mjs",
+    "ci": "npm test && npm run typecheck && npm run smoke:pi"
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*",

@@ -25,7 +25,7 @@ Current fallback behavior can report failure, but it cannot recover operationall
 - `.kanban/1-to_refine/KB-0009-reality-check-production-readiness-gaps.md`
 - `.kanban/5-done/KB-0004-build-interactive-questionnaire-ui.md`
 - `.kanban/5-done/02-KB-0005-activation-state-and-completion-flow.md`
-- `.kanban/2-planned/01-KB-0010-reproducible-build-typecheck-and-ci-baseline.md`
+- `.kanban/3-in_progress/KB-0010-reproducible-build-typecheck-and-ci-baseline.md`
 - `.plans/ARCHITECTURE.md`
 - `.plans/IMPLEMENTATION_PLAN.md`
 - `src/index.ts`

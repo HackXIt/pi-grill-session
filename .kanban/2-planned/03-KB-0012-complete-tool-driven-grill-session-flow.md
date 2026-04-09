@@ -26,7 +26,7 @@ Deliver the remaining v1 tool-driven grill-session behavior on top of the build 
 - `.kanban/1-to_refine/KB-0009-reality-check-production-readiness-gaps.md`
 - `.kanban/5-done/KB-0004-build-interactive-questionnaire-ui.md`
 - `.kanban/5-done/02-KB-0005-activation-state-and-completion-flow.md`
-- `.kanban/2-planned/01-KB-0010-reproducible-build-typecheck-and-ci-baseline.md`
+- `.kanban/3-in_progress/KB-0010-reproducible-build-typecheck-and-ci-baseline.md`
 - `.kanban/2-planned/02-KB-0011-persist-pending-batches-and-add-recovery-command.md`
 - `.plans/ARCHITECTURE.md`
 - `.plans/IMPLEMENTATION_PLAN.md`

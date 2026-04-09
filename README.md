@@ -2,7 +2,23 @@
 
 Interactive grill-session extension for pi.
 
-## Install as a pi package
+## Prerequisites
+
+- Node 24+
+- npm
+
+A global `pi` install is optional for local development. The reproducible verification flow below uses the repo-local `pi` binary installed from `node_modules`.
+
+## Try the extension
+
+### Load from the repo checkout
+
+```bash
+npm install
+npm exec -- pi --extension ./src/index.ts
+```
+
+### Install as a pi package
 
 From GitHub:
 
@@ -16,12 +32,6 @@ Or test it without installing permanently:
 pi -e git:github.com/HackXIt/pi-grill-session
 ```
 
-## Load locally during development
-
-```bash
-pi --extension /home/hackxit/git-stash/pi-grill-session/src/index.ts
-```
-
 ## Commands
 
 Current commands:
@@ -29,29 +39,35 @@ Current commands:
 - `/grill`
 - `/grill-end`
 
-## Development
+## Verify the repo baseline
 
-Install dependencies:
+From a fresh checkout:
 
 ```bash
 npm install
-```
-
-Run checks:
-
-```bash
 npm test
 npm run typecheck
-npm run package:check
+npm run smoke:pi
+```
+
+`npm run smoke:pi` uses the repo-local `pi` CLI to load `./src/index.ts`, starts grill mode with `/grill`, and verifies that the model can call the `questionnaire` tool and reach the expected non-interactive fallback:
+
+- `Interactive questionnaire unavailable: no UI is attached.`
+
+Equivalent direct smoke command:
+
+```bash
+PI_OFFLINE=1 npm exec -- pi --extension ./src/index.ts --no-tools --no-skills --append-system-prompt "Call the questionnaire tool immediately. Do not use any other tools. Do not read files. Do not ask follow-up questions before calling the questionnaire tool." --mode json --print --no-session "/grill" "Use the questionnaire tool right now to ask one question with two options: red and blue. Then tell me what happened."
 ```
 
 ## CI
 
-CI validates:
+CI validates a clean checkout with:
 
+- `npm ci`
 - `npm test`
 - `npm run typecheck`
-- `npm pack`
+- `npm run smoke:pi`
 
 ## Planning and execution
 

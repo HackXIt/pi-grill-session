@@ -9,13 +9,14 @@ minimum_thinking: high
 
 ## Summary
 
-The repo can demo isolated pieces in pi, but it does not yet deliver the v1 contract described in `.plans/ARCHITECTURE.md` and `.plans/IMPLEMENTATION_PLAN.md`. Passing unit tests currently creates a false-green signal: the core automatic grill-session loop is still missing, fallback/recovery is not real yet, and the package is not reproducibly buildable from a fresh checkout.
+The repo still misses key v1 production-readiness behavior from `.plans/ARCHITECTURE.md` and `.plans/IMPLEMENTATION_PLAN.md`, even though isolated pieces demo well and `npm test` is green. The planning drift identified in this findings ticket has now been corrected at the board level via `KB-0010`, `KB-0011`, and `KB-0012`, but the implementation gap remains: the tool-driven multi-round grill flow is incomplete, fallback/recovery is not operational, and a fresh checkout still does not typecheck or declare the needed runtime dependencies.
 
 ## Lane Notes
 
 - Current lane: 1-to_refine
 - Order: n/a
 - Owner: reality-check
+- Parent findings ticket; active cleanup stream is `KB-0010` in `3-in_progress`, followed by `KB-0011` → `KB-0012` in `2-planned`
 
 ## References
 
@@ -24,6 +25,7 @@ The repo can demo isolated pieces in pi, but it does not yet deliver the v1 cont
 - `README.md`
 - `package.json`
 - `tsconfig.json`
+- `skills/grill-session/SKILL.md`
 - `src/index.ts`
 - `src/grill-state.ts`
 - `src/questionnaire-tool.ts`
@@ -31,20 +33,28 @@ The repo can demo isolated pieces in pi, but it does not yet deliver the v1 cont
 - `test/questionnaire.test.ts`
 - `.kanban/5-done/KB-0004-build-interactive-questionnaire-ui.md`
 - `.kanban/5-done/02-KB-0005-activation-state-and-completion-flow.md`
+- `.kanban/3-in_progress/KB-0010-reproducible-build-typecheck-and-ci-baseline.md`
+- `.kanban/2-planned/02-KB-0011-persist-pending-batches-and-add-recovery-command.md`
+- `.kanban/2-planned/03-KB-0012-complete-tool-driven-grill-session-flow.md`
 - `.kanban/0-open/KB-0008-post-v1-release-distribution-hardening.md`
 
 ## Symptoms
 
-### 1. Core v1 behavior is still missing from both code and backlog
+### 1. Core v1 behavior is still missing from code, even though backlog drift is now corrected
 
 The architecture and implementation plan say v1 should automatically run repeated questionnaire rounds until completion, with a dedicated completion tool and a manual fallback path.
 
-Current repo state is materially short of that:
+Current repo state is still materially short of that:
 - `src/index.ts` activates grill mode and loads the questionnaire runtime, but it does not orchestrate frontier batches.
 - `src/grill-state.ts` exports `GRILL_SESSION_COMPLETION_TOOL = "complete_grill_session"`, but no completion tool is registered anywhere in `src/`.
-- `.plans/IMPLEMENTATION_PLAN.md` still includes Slice 5 (`questionnaire tool`, `auto-open behavior`, `completion tool + marker phrase`) and Slice 6 (`README`, `install instructions`, `CI`), but `.kanban/` has executable tickets only through `KB-0005` plus post-v1 epics.
+- `skills/grill-session/SKILL.md` tells the model to prefer `questionnaire` and emit `[GRILL SESSION COMPLETE]`, but the runtime does not yet enforce or complete that tool-driven lifecycle.
 
-This is backlog drift: the board makes the repo look closer to done than it actually is.
+The planning side of this symptom has now been corrected:
+- `KB-0010` captures the missing Slice 6 build/typecheck/CI baseline.
+- `KB-0011` captures the missing interrupted-batch fallback/recovery lifecycle.
+- `KB-0012` captures the missing Slice 5 completion-tool and multi-round grill flow.
+
+That removes the backlog illusion, but not the underlying product gap.
 
 ### 2. The fallback/recovery story is still mostly theoretical
 
@@ -60,7 +70,7 @@ This means the system can fail gracefully in text, but not recover operationally
 
 ### 3. The automated test surface is giving a false-green build signal
 
-Observed locally:
+Observed locally during this refinement pass:
 - `npm test` passes.
 - `npx tsc --noEmit` fails.
 - `npm ls --depth=0` shows only `typescript` and `vitest` installed at the repo level.
@@ -92,9 +102,9 @@ Those behaviors do have unit coverage, but branch-aware runtime behavior is exac
 
 ### Root cause A: v1 slices were not fully converted into executable kanban work
 
-The implementation plan still describes Slice 5 and Slice 6 as core v1 work, but the board does not contain corresponding executable tickets. Instead, the only remaining visible backlog item near packaging is `KB-0008`, which is explicitly framed as post-v1 release hardening.
+The implementation plan still describes Slice 5 and Slice 6 as core v1 work, but the board originally did not contain corresponding executable tickets. Instead, the only remaining visible backlog item near packaging was `KB-0008`, which is explicitly framed as post-v1 release hardening.
 
-That creates a planning illusion: real v1 blockers have slipped out of the active board.
+That planning illusion has now been corrected by the cleanup stream `KB-0010` / `KB-0011` / `KB-0012`, but only at the ticketing layer. The implementation blockers remain open.
 
 ### Root cause B: the activation/state layer and questionnaire runtime are not integrated around a real session lifecycle
 
@@ -104,57 +114,62 @@ The current state model is enough to remember “grill mode is on/off,” but no
 
 The repo has good pure-logic coverage, but not a trustworthy build/integration gate. Without typecheck + dependency declaration + automated pi smoke, the current green test suite mostly proves helper logic, not shippability.
 
-## Recommended follow-on tickets / corrections
+## Derived cleanup stream
 
-### RC-1: Add the missing v1 orchestration slice as an explicit ticket
+The real seam of change is now represented as one ordered cleanup stream:
 
-Create a v1 executable ticket derived from `.plans/IMPLEMENTATION_PLAN.md` Slice 5 that covers:
-- automatic questionnaire invocation during active grill mode
-- repeated frontier batches until the tree is complete
-- real registration/use of `complete_grill_session`
-- the visible completion marker remaining aligned with the tool-driven completion path
+### 1. `KB-0010` — reproducible build, typecheck, and CI baseline
 
-### RC-2: Add a real fallback/recovery ticket for interrupted questionnaire flows
+Owns the fresh-checkout build contract:
+- declare/document the runtime and type dependencies actually used by the extension
+- add a repo-local typecheck script and make it pass
+- add CI for install + test + typecheck + one smoke path that loads the real questionnaire runtime
+- keep `KB-0008` narrowed to true post-v1 publication/versioning work
 
-Create a v1 executable ticket that covers:
-- persisting pending-batch metadata in grill-session state
-- a manual reopen/recover path when UI is unavailable or the questionnaire is cancelled
-- verification that failure/cancellation does not strand the session in a fake-active state
+### 2. `KB-0011` — persist pending batches and add recovery command
 
-### RC-3: Add a reproducible build / CI baseline ticket and narrow KB-0008 back to true post-v1 work
+Owns interrupted-batch lifecycle safety:
+- persist minimal pending-batch metadata in grill-session state
+- expose `/grill-reopen` as the single recovery path for cancelled/no-UI batches
+- clear pending metadata correctly on explicit end/completion paths
+- verify cancellation/no-UI no longer strands the session in fake-active or fake-complete state
 
-Create a v1 executable ticket that covers:
-- declaring or documenting the required runtime/build dependencies
-- adding a `typecheck` script and making it pass
-- adding CI for at least install + test + typecheck
-- adding one automated smoke path that loads `src/index.ts` with the questionnaire runtime present
+### 3. `KB-0012` — complete tool-driven grill-session flow
 
-Correction to backlog policy:
-- keep `KB-0008` for true post-v1 release/versioning automation only
-- move the baseline package/CI/build work back into active v1 scope, because `.plans/IMPLEMENTATION_PLAN.md` already says that baseline is part of v1
+Owns the remaining happy-path v1 behavior on top of `KB-0010` and `KB-0011`:
+- register and use `complete_grill_session`
+- keep the visible marker phrase aligned with the tool-driven completion path
+- verify multi-round questionnaire usage while grill mode is active
+- verify grill-mode prompt injection stops after tool-driven completion
+
+Sequencing note: `KB-0010` goes first to make the build/test seam trustworthy, `KB-0011` makes interruption state real, and `KB-0012` closes the happy path on top of that foundation.
 
 ## Acceptance Criteria
 
-- [ ] The active board contains an explicit v1 ticket for automatic questionnaire/completion orchestration.
-- [ ] The active board contains an explicit v1 ticket for pending-batch fallback/recovery.
-- [ ] The active board contains an explicit v1 ticket for reproducible build/typecheck/CI baseline.
-- [ ] `KB-0008` is either narrowed to true post-v1 release automation or replaced by a clearer post-v1-only ticket.
-- [ ] Future review on this cleanup stream uses `npx tsc --noEmit` plus a minimal pi smoke check in addition to `npm test`.
+- [x] The active board contains an explicit v1 ticket for automatic questionnaire/completion orchestration (`KB-0012`).
+- [x] The active board contains an explicit v1 ticket for pending-batch fallback/recovery (`KB-0011`).
+- [x] The active board contains an explicit v1 ticket for reproducible build/typecheck/CI baseline (`KB-0010`).
+- [x] `KB-0008` remains narrowed to true post-v1 release/versioning hardening.
+- [x] The cleanup stream tickets explicitly require typecheck plus a minimal pi smoke path in addition to `npm test`.
 
 ## Verification
 
 - `npm test`
 - `npx tsc --noEmit`
 - `npm ls --depth=0`
-- `PI_OFFLINE=1 pi -e ./src/index.ts -p --no-session "hello"`
-- inspect `.kanban/` and confirm Slice 5 / Slice 6 gaps are represented as executable v1 tickets
+- inspect `.kanban/3-in_progress/KB-0010-reproducible-build-typecheck-and-ci-baseline.md`, `.kanban/2-planned/02-KB-0011-persist-pending-batches-and-add-recovery-command.md`, and `.kanban/2-planned/03-KB-0012-complete-tool-driven-grill-session-flow.md
+- confirm each cleanup ticket links back to `KB-0009` and includes `npm test`, typecheck, and a minimal pi smoke path in its Verification section
+- inspect `.kanban/0-open/KB-0008-post-v1-release-distribution-hardening.md` and confirm it remains post-v1-only with `priority: ignore`
 
 ## Notes
 
-- This is the single active reality-check findings ticket for the repo.
-- `KB-0004` and `KB-0005` still look valid as completed slices; the problem is not that those slices were fake, but that the remaining v1 work is under-tracked and under-verified.
-- Secondary drift: `README.md` still describes the repo as mostly an initial skeleton, which understates the implemented pieces while also avoiding the harder question of what is still not production-real.
+- This remains the single active reality-check findings ticket for the repo.
+- It is the parent findings record for cleanup stream `KB-0010` / `KB-0011` / `KB-0012`; implementation should happen through those tickets, not by treating this findings document as an implementation ticket.
+- `KB-0004` and `KB-0005` still look valid as completed slices; the problem is not that those slices were fake, but that the remaining v1 work was under-tracked and under-verified.
+- Secondary drift remains in `README.md`: it still describes the repo as mostly an initial skeleton, which understates the implemented pieces while also avoiding the harder question of what is still not production-real.
 
 ## Change Log
 
 - created from fresh repo audit
+- refined into ordered cleanup stream `KB-0010` → `KB-0011` → `KB-0012`
+- reconciled the findings ticket with current board state after re-running `npm test`, `npx tsc --noEmit`, and `npm ls --depth=0`
