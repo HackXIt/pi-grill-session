@@ -19,9 +19,14 @@ export const COMMAND_GRILL_END = "grill-end";
 export { SKILL_GRILL_SESSION };
 
 const CUSTOM_MESSAGE_TYPE = "grill-session";
+const KANBAN_ROLE_SESSION_PATTERN = /(?:^|[\\/])\.kanban[\\/]runtime[\\/]sessions[\\/][^\\/]+\.jsonl$/i;
 
 function shouldSkipQuestionnaireRuntimeLoad(): boolean {
 	return typeof process !== "undefined" && process.env.VITEST === "true";
+}
+
+function isAutonomousKanbanRoleSession(sessionFile: string | undefined): boolean {
+	return typeof sessionFile === "string" && KANBAN_ROLE_SESSION_PATTERN.test(sessionFile);
 }
 
 function sameState(left: GrillSessionState, right: GrillSessionState): boolean {
@@ -39,11 +44,25 @@ export async function loadQuestionnaireRuntime(pi: ExtensionAPI): Promise<void> 
 
 export default function grillSessionExtension(pi: ExtensionAPI) {
 	let state: GrillSessionState = restoreGrillSessionState([]);
+	let disabledForAutonomousKanbanRole = false;
+	let questionnaireRuntimeLoaded = false;
 
-	if (!shouldSkipQuestionnaireRuntimeLoad()) {
+	function ensureQuestionnaireRuntimeLoaded() {
+		if (questionnaireRuntimeLoaded || shouldSkipQuestionnaireRuntimeLoad() || disabledForAutonomousKanbanRole) {
+			return;
+		}
+		questionnaireRuntimeLoaded = true;
 		void loadQuestionnaireRuntime(pi).catch((error) => {
+			questionnaireRuntimeLoaded = false;
 			console.error("Failed to load questionnaire runtime", error);
 		});
+	}
+
+	function syncSessionMode(ctx: { sessionManager?: { getSessionFile?(): string | undefined } }) {
+		disabledForAutonomousKanbanRole = isAutonomousKanbanRoleSession(ctx.sessionManager?.getSessionFile?.());
+		if (!disabledForAutonomousKanbanRole) {
+			ensureQuestionnaireRuntimeLoaded();
+		}
 	}
 
 	function setState(next: GrillSessionState) {
@@ -69,6 +88,10 @@ export default function grillSessionExtension(pi: ExtensionAPI) {
 	pi.registerCommand(COMMAND_GRILL, {
 		description: "Start or continue an interactive grill session",
 		handler: async (args, ctx) => {
+			syncSessionMode(ctx);
+			if (disabledForAutonomousKanbanRole) {
+				return;
+			}
 			setState(activateGrillSession(state, "command"));
 			sendStartupMessage(buildCanonicalGrillSkillCommand(args), ctx);
 		},
@@ -76,7 +99,11 @@ export default function grillSessionExtension(pi: ExtensionAPI) {
 
 	pi.registerCommand(COMMAND_GRILL_END, {
 		description: "End the active grill session",
-		handler: async (_args, _ctx) => {
+		handler: async (_args, ctx) => {
+			syncSessionMode(ctx);
+			if (disabledForAutonomousKanbanRole) {
+				return;
+			}
 			setState(completeGrillSession(state));
 			pi.sendMessage({
 				customType: CUSTOM_MESSAGE_TYPE,
@@ -88,7 +115,8 @@ export default function grillSessionExtension(pi: ExtensionAPI) {
 	});
 
 	pi.on("input", async (event, ctx) => {
-		if (event.source === "extension") {
+		syncSessionMode(ctx);
+		if (disabledForAutonomousKanbanRole || event.source === "extension") {
 			return { action: "continue" };
 		}
 
@@ -116,15 +144,18 @@ export default function grillSessionExtension(pi: ExtensionAPI) {
 	});
 
 	pi.on("session_start", async (_event, ctx) => {
+		syncSessionMode(ctx);
 		restoreStateFromBranch(ctx);
 	});
 
 	pi.on("session_tree", async (_event, ctx) => {
+		syncSessionMode(ctx);
 		restoreStateFromBranch(ctx);
 	});
 
-	pi.on("before_agent_start", async (event) => {
-		if (!state.active || state.completed) {
+	pi.on("before_agent_start", async (event, ctx) => {
+		syncSessionMode(ctx);
+		if (disabledForAutonomousKanbanRole || !state.active || state.completed) {
 			return undefined;
 		}
 		return {

@@ -40,7 +40,11 @@ function createCommandContext(overrides: Record<string, unknown> = {}) {
 	};
 }
 
-function createSessionContext(branch: any[] = [], overrides: Record<string, unknown> = {}) {
+function createSessionContext(
+	branch: any[] = [],
+	overrides: Record<string, unknown> = {},
+	sessionFile = "/tmp/session.jsonl",
+) {
 	return {
 		ui: {
 			notify: vi.fn(),
@@ -48,6 +52,7 @@ function createSessionContext(branch: any[] = [], overrides: Record<string, unkn
 		},
 		sessionManager: {
 			getBranch: () => branch,
+			getSessionFile: () => sessionFile,
 		},
 		...overrides,
 	};
@@ -205,5 +210,41 @@ describe("grill-session extension", () => {
 			]),
 		);
 		await expect(beforeAgentStart({ systemPrompt: "base prompt" }, createSessionContext())).resolves.toBeUndefined();
+	});
+
+	it("stays fully inert in autonomous kanban role sessions", async () => {
+		const { events, appendEntry } = createPiDouble();
+		const sessionStart = events.get("session_start")!;
+		const input = events.get("input")!;
+		const beforeAgentStart = events.get("before_agent_start")!;
+		const confirm = vi.fn();
+		const sessionFile = "/repo/.kanban/runtime/sessions/manager.jsonl";
+		const activeBranch = [
+			{ type: "custom", customType: GRILL_SESSION_STATE_ENTRY, data: { active: true, activationSource: "plain-text", completed: false } },
+		];
+
+		await sessionStart({}, createSessionContext(activeBranch, { ui: { notify: vi.fn(), confirm } }, sessionFile));
+
+		await expect(
+			input(
+				{ text: "should we grill this further?", source: "interactive" },
+				createSessionContext(activeBranch, { ui: { notify: vi.fn(), confirm } }, sessionFile),
+			),
+		).resolves.toEqual({ action: "continue" });
+		await expect(
+			input(
+				{ text: "/skill:grill-session", source: "interactive" },
+				createSessionContext(activeBranch, { ui: { notify: vi.fn(), confirm } }, sessionFile),
+			),
+		).resolves.toEqual({ action: "continue" });
+		await expect(
+			beforeAgentStart(
+				{ systemPrompt: "base prompt" },
+				createSessionContext(activeBranch, { ui: { notify: vi.fn(), confirm } }, sessionFile),
+			),
+		).resolves.toBeUndefined();
+
+		expect(confirm).not.toHaveBeenCalled();
+		expect(appendEntry).not.toHaveBeenCalled();
 	});
 });
