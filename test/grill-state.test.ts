@@ -53,6 +53,8 @@ describe("grill session state", () => {
 		expect(instruction).toContain("questionnaire");
 		expect(instruction).toContain("Prefer the questionnaire tool over plain-text questioning");
 		expect(instruction).toContain("current frontier batch");
+		expect(instruction).toContain("autonomous kanban-managed roles");
+		expect(instruction).toContain("kanban operator");
 		expect(instruction).toContain("[GRILL SESSION COMPLETE]");
 	});
 });

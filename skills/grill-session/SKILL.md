@@ -9,6 +9,9 @@ If a question can be answered by exploring the codebase, explore the codebase in
 
 ## Grill-session behavior
 
+- Use this skill only in interactive manual sessions.
+- Never use this skill in autonomous kanban-managed roles such as manager, implementer, reviewer, refiner, planner, reality-check, or recovery.
+- `kanban operator` is allowed to use this skill because it is user-owned and interactive.
 - Stay in grill-session mode until the decision tree is complete.
 - Focus on the current frontier: ask only the next question or batch needed to make progress.
 - Separate distinct decisions instead of bundling unrelated topics together.

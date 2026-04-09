@@ -71,6 +71,8 @@ export function getActiveGrillSessionInstruction(): string {
 		"Ask only the current frontier batch needed to make progress.",
 		"When the questionnaire tool is available, use the questionnaire for the current frontier batch.",
 		"Prefer the questionnaire tool over plain-text questioning whenever it can capture the user's answer batch.",
+		"Do not use grill-session behavior in autonomous kanban-managed roles such as manager, implementer, reviewer, refiner, planner, reality-check, or recovery.",
+		"Reserve grill-session for interactive manual sessions, including direct user chats and kanban operator.",
 		"Continue batch-by-batch until the important unresolved branches are complete, then emit [GRILL SESSION COMPLETE].",
 	].join(" ");
 }
