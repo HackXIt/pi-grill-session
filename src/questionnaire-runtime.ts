@@ -1,5 +1,5 @@
-import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { Editor, Key, matchesKey, truncateToWidth, wrapTextWithAnsi, type EditorTheme } from "@mariozechner/pi-tui";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { Editor, Key, matchesKey, truncateToWidth, wrapTextWithAnsi, type EditorTheme } from "@earendil-works/pi-tui";
 import {
 	normalizeQuestionnaireBatch,
 	type QuestionnaireBatch,

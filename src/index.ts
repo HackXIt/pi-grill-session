@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
 	buildCanonicalGrillSkillCommand,
 	classifyGrillActivationInput,
@@ -52,6 +52,7 @@ export default function grillSessionExtension(pi: ExtensionAPI) {
 	let state: GrillSessionState = restoreGrillSessionState([]);
 	let disabledForAutonomousKanbanRole = false;
 	let questionnaireRuntimeLoaded = false;
+	let questionnaireRuntimeLoadPromise: Promise<void> | undefined;
 
 	const questionnaireHandlers: QuestionnaireToolHandlers = {
 		onPendingBatch(pendingBatch) {
@@ -62,21 +63,31 @@ export default function grillSessionExtension(pi: ExtensionAPI) {
 		},
 	};
 
-	function ensureQuestionnaireRuntimeLoaded() {
+	function ensureQuestionnaireRuntimeLoaded(): Promise<void> {
 		if (questionnaireRuntimeLoaded || shouldSkipQuestionnaireRuntimeLoad() || disabledForAutonomousKanbanRole) {
-			return;
+			return Promise.resolve();
 		}
-		questionnaireRuntimeLoaded = true;
-		void loadQuestionnaireRuntime(pi, questionnaireHandlers).catch((error) => {
-			questionnaireRuntimeLoaded = false;
-			console.error("Failed to load questionnaire runtime", error);
-		});
+		if (questionnaireRuntimeLoadPromise) {
+			return questionnaireRuntimeLoadPromise;
+		}
+		questionnaireRuntimeLoadPromise = loadQuestionnaireRuntime(pi, questionnaireHandlers)
+			.then(() => {
+				questionnaireRuntimeLoaded = true;
+			})
+			.catch((error) => {
+				questionnaireRuntimeLoaded = false;
+				console.error("Failed to load questionnaire runtime", error);
+			})
+			.finally(() => {
+				questionnaireRuntimeLoadPromise = undefined;
+			});
+		return questionnaireRuntimeLoadPromise;
 	}
 
 	function syncSessionMode(ctx: { sessionManager?: { getSessionFile?(): string | undefined } }) {
 		disabledForAutonomousKanbanRole = isAutonomousKanbanRoleSession(ctx.sessionManager?.getSessionFile?.());
 		if (!disabledForAutonomousKanbanRole) {
-			ensureQuestionnaireRuntimeLoaded();
+			void ensureQuestionnaireRuntimeLoaded();
 		}
 	}
 
@@ -207,7 +218,11 @@ export default function grillSessionExtension(pi: ExtensionAPI) {
 
 	pi.on("before_agent_start", async (event, ctx) => {
 		syncSessionMode(ctx);
-		if (disabledForAutonomousKanbanRole || !state.active || state.completed) {
+		if (disabledForAutonomousKanbanRole) {
+			return undefined;
+		}
+		await ensureQuestionnaireRuntimeLoaded();
+		if (!state.active || state.completed) {
 			return undefined;
 		}
 		return {

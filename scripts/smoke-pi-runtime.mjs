@@ -16,7 +16,6 @@ const result = spawnSync(
 		"--no-extensions",
 		"--extension",
 		"./src/index.ts",
-		"--no-tools",
 		"--no-skills",
 		"--append-system-prompt",
 		systemPrompt,
