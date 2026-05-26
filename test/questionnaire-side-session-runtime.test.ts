@@ -9,7 +9,10 @@ const theme = {
 	fg: (_name: string, text: string) => text,
 	bg: (_name: string, text: string) => text,
 };
-const tui = { requestRender: vi.fn() };
+function createTui() {
+	return { requestRender: vi.fn(), stop: vi.fn(), start: vi.fn() };
+}
+const tui = createTui();
 
 function record(overrides: Partial<SideSessionRecord> = {}): SideSessionRecord {
 	return {
@@ -89,6 +92,29 @@ describe("questionnaire side-session runtime", () => {
 		expect(chooseImport).toHaveBeenCalledWith(record());
 		expect(component.render(80).join("\n")).toContain("Side session: Compared options. (child-ref)");
 		expect(component.render(80).join("\n")).toContain("○ Minimal");
+	});
+
+	it("suspends the questionnaire TUI while the side session owns the terminal", async () => {
+		const localTui = createTui();
+		const launch = vi.fn().mockResolvedValue(record());
+		let component: any;
+		await runQuestionnaireBatch(batchInput, {
+			hasUI: true,
+			cwd: "/repo/project",
+			ui: {
+				custom: vi.fn().mockImplementation((build) => {
+					component = build(localTui, theme, undefined, vi.fn());
+					return Promise.resolve({ cancelled: true, answers: {}, sideSessionRecords: {} });
+				}),
+			},
+		} as never, { sideSessions: { launch, chooseImport: vi.fn().mockResolvedValue("manual") } });
+
+		await component.handleInput(DOWN);
+		await component.handleInput(ENTER);
+
+		expect(localTui.stop.mock.invocationCallOrder[0]).toBeLessThan(launch.mock.invocationCallOrder[0]);
+		expect(localTui.start.mock.invocationCallOrder[0]).toBeGreaterThan(launch.mock.invocationCallOrder[0]);
+		expect(localTui.requestRender).toHaveBeenCalledWith(true);
 	});
 
 	it("imports an option suggestion into the draft but does not submit the batch", async () => {

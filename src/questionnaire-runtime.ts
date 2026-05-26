@@ -263,13 +263,25 @@ export async function runQuestionnaireBatch(
 				return;
 			}
 			const launcher = options.sideSessions?.launch ?? launchQuestionnaireSideSession;
-			const record = await launcher({
-				batch,
-				sourceQuestionId: question.id,
-				cwd: ctx.cwd ?? process.cwd(),
-				answers,
-				parentSessionRef: ctx.sessionManager?.getSessionFile?.(),
-			});
+			const terminalTui = tui as unknown as {
+				stop: () => void;
+				start: () => void;
+				requestRender: (force?: boolean) => void;
+			};
+			let record: SideSessionRecord;
+			terminalTui.stop();
+			try {
+				record = await launcher({
+					batch,
+					sourceQuestionId: question.id,
+					cwd: ctx.cwd ?? process.cwd(),
+					answers,
+					parentSessionRef: ctx.sessionManager?.getSessionFile?.(),
+				});
+			} finally {
+				terminalTui.start();
+				terminalTui.requestRender(true);
+			}
 			sideSessionRecords = { ...sideSessionRecords, [question.id]: record };
 			const choice = await chooseImport(record);
 			if (choice === "import") {
