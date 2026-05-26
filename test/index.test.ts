@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { normalizeQuestionnaireBatch } from "../src/domain";
 import extension, { COMMAND_GRILL, COMMAND_GRILL_END, COMMAND_GRILL_REOPEN } from "../src/index";
+import { COMMAND_GRILL_SIDE_RETURN } from "../src/side-session/side-return-command";
 import { GRILL_SESSION_COMPLETION_MARKER, GRILL_SESSION_STATE_ENTRY } from "../src/grill-state";
 
 type CommandHandler = (args: string, ctx: any) => Promise<void>;
@@ -67,7 +68,12 @@ describe("grill-session extension", () => {
 	it("registers grill commands and lifecycle handlers", () => {
 		const { commands, events } = createPiDouble();
 
-		expect(Array.from(commands.keys())).toEqual([COMMAND_GRILL, COMMAND_GRILL_END, COMMAND_GRILL_REOPEN]);
+		expect(Array.from(commands.keys())).toEqual([
+			COMMAND_GRILL_SIDE_RETURN,
+			COMMAND_GRILL,
+			COMMAND_GRILL_END,
+			COMMAND_GRILL_REOPEN,
+		]);
 		expect(Array.from(events.keys())).toEqual([
 			"input",
 			"session_start",

@@ -3,6 +3,7 @@ import { Text } from "@earendil-works/pi-tui";
 import { Type } from "@sinclair/typebox";
 import type { QuestionnaireBatch, QuestionnaireResult } from "./domain";
 import type { PendingQuestionnaireBatch } from "./grill-state";
+import type { SideSessionRecord } from "./side-session/types";
 import { runQuestionnaireBatch } from "./questionnaire-runtime";
 
 interface QuestionnaireToolDetails {
@@ -11,6 +12,7 @@ interface QuestionnaireToolDetails {
 	renderedLines: string[];
 	cancelled: boolean;
 	pendingReason?: PendingQuestionnaireBatch["reason"];
+	sideSessionRecords?: Record<string, SideSessionRecord | undefined>;
 }
 
 export interface QuestionnaireToolHandlers {
@@ -69,6 +71,7 @@ export function registerQuestionnaireTool(pi: ExtensionAPI, handlers: Questionna
 						renderedLines: outcome.renderedLines,
 						cancelled: true,
 						pendingReason: outcome.pendingReason,
+						...(outcome.sideSessionRecords ? { sideSessionRecords: outcome.sideSessionRecords } : {}),
 					} satisfies QuestionnaireToolDetails,
 				};
 			}
@@ -81,6 +84,7 @@ export function registerQuestionnaireTool(pi: ExtensionAPI, handlers: Questionna
 					result: outcome.result,
 					renderedLines: outcome.renderedLines,
 					cancelled: false,
+					sideSessionRecords: outcome.sideSessionRecords,
 				} satisfies QuestionnaireToolDetails,
 			};
 		},

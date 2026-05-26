@@ -19,9 +19,11 @@ import {
 	setQuestionNotes,
 	type QuestionnaireDraftAnswers,
 } from "./questionnaire";
+import { launchQuestionnaireSideSession } from "./side-session/launcher";
+import type { SideSessionRecord } from "./side-session/types";
 
 interface QuestionRow {
-	kind: "option" | "notes" | "custom";
+	kind: "option" | "notes" | "custom" | "side-session";
 	optionId?: string;
 }
 
@@ -37,6 +39,7 @@ export interface PendingQuestionnaireOutcome {
 	contentText: string;
 	cancelled: true;
 	pendingReason: PendingQuestionnaireReason;
+	sideSessionRecords?: Record<string, SideSessionRecord | undefined>;
 }
 
 export interface SubmittedQuestionnaireOutcome {
@@ -46,9 +49,28 @@ export interface SubmittedQuestionnaireOutcome {
 	renderedLines: string[];
 	contentText: string;
 	cancelled: false;
+	sideSessionRecords: Record<string, SideSessionRecord | undefined>;
 }
 
 export type QuestionnaireRuntimeOutcome = PendingQuestionnaireOutcome | SubmittedQuestionnaireOutcome;
+
+export type SideSessionImportChoice = "manual" | "import" | "view" | "discard";
+
+export interface QuestionnaireSideSessionController {
+	launch(request: {
+		batch: QuestionnaireBatch;
+		sourceQuestionId: string;
+		cwd: string;
+		answers: QuestionnaireDraftAnswers;
+		parentSessionRef?: string;
+	}): Promise<SideSessionRecord>;
+	chooseImport?(record: SideSessionRecord): Promise<SideSessionImportChoice>;
+	confirmReplace?(record: SideSessionRecord): Promise<boolean>;
+}
+
+export interface RunQuestionnaireBatchOptions {
+	sideSessions?: Partial<QuestionnaireSideSessionController>;
+}
 
 function renderQuestionSummary(batch: QuestionnaireBatch, answers: QuestionnaireDraftAnswers): string[] {
 	return batch.questions.map((question) => {
@@ -75,6 +97,7 @@ function getQuestionRows(question: QuestionnaireQuestion, answers: Questionnaire
 	if (question.allowCustomAnswer) {
 		rows.push({ kind: "custom" });
 	}
+	rows.push({ kind: "side-session" });
 	return rows;
 }
 
@@ -104,7 +127,8 @@ export function buildQuestionnaireRecoveryText(reason: PendingQuestionnaireReaso
 
 export async function runQuestionnaireBatch(
 	params: QuestionnaireBatchInput,
-	ctx: Pick<ExtensionContext, "hasUI" | "ui">,
+	ctx: Pick<ExtensionContext, "hasUI" | "ui"> & Partial<Pick<ExtensionContext, "cwd" | "sessionManager">>,
+	options: RunQuestionnaireBatchOptions = {},
 ): Promise<QuestionnaireRuntimeOutcome> {
 	const batch = normalizeQuestionnaireBatch(params);
 	if (!ctx.hasUI) {
@@ -119,10 +143,15 @@ export async function runQuestionnaireBatch(
 		};
 	}
 
-	const interaction = await ctx.ui.custom<{ cancelled: boolean; answers: QuestionnaireDraftAnswers }>((tui, theme, _kb, done) => {
+	const interaction = await ctx.ui.custom<{
+		cancelled: boolean;
+		answers: QuestionnaireDraftAnswers;
+		sideSessionRecords: Record<string, SideSessionRecord | undefined>;
+	}>((tui, theme, _kb, done) => {
 		let currentTab = 0;
 		let focusIndex = 0;
 		let answers: QuestionnaireDraftAnswers = {};
+		let sideSessionRecords: Record<string, SideSessionRecord | undefined> = {};
 		let input: InputState | null = null;
 		let cachedLines: string[] | undefined;
 
@@ -180,10 +209,81 @@ export async function runQuestionnaireBatch(
 		}
 
 		function submit(cancelled: boolean) {
-			done({ cancelled, answers });
+			done({ cancelled, answers, sideSessionRecords });
 		}
 
-		function handleQuestionEnter(question: QuestionnaireQuestion) {
+		async function chooseImport(record: SideSessionRecord): Promise<SideSessionImportChoice> {
+			if (options.sideSessions?.chooseImport) {
+				return options.sideSessions.chooseImport(record);
+			}
+			const choices = [
+				"Return manually",
+				...(record.suggestion ? ["Import suggestion"] : []),
+				"View record",
+				"Discard record",
+			];
+			const choice = await ctx.ui.select(`Side session returned: ${record.summary} (${record.childSessionRef})`, choices);
+			if (choice === "Import suggestion") {
+				return "import";
+			}
+			if (choice === "View record") {
+				return "view";
+			}
+			if (choice === "Discard record") {
+				return "discard";
+			}
+			return "manual";
+		}
+
+		async function confirmReplace(record: SideSessionRecord): Promise<boolean> {
+			if (options.sideSessions?.confirmReplace) {
+				return options.sideSessions.confirmReplace(record);
+			}
+			return ctx.ui.confirm("Replace side session?", `${record.summary}\n\nThis replaces the current record for this question.`);
+		}
+
+		function applySuggestion(record: SideSessionRecord) {
+			if (!record.suggestion) {
+				return;
+			}
+			if (record.suggestion.mode === "custom") {
+				answers = setQuestionCustomAnswer(batch, answers, record.suggestion.questionId, record.suggestion.customAnswer);
+				return;
+			}
+			answers = selectQuestionOption(batch, answers, record.suggestion.questionId, record.suggestion.selectedOptionId);
+			if (record.suggestion.notes) {
+				answers = setQuestionNotes(batch, answers, record.suggestion.questionId, record.suggestion.notes);
+			}
+		}
+
+		async function openSideSession(question: QuestionnaireQuestion) {
+			const existingRecord = sideSessionRecords[question.id];
+			if (existingRecord && !(await confirmReplace(existingRecord))) {
+				refresh();
+				return;
+			}
+			const launcher = options.sideSessions?.launch ?? launchQuestionnaireSideSession;
+			const record = await launcher({
+				batch,
+				sourceQuestionId: question.id,
+				cwd: ctx.cwd ?? process.cwd(),
+				answers,
+				parentSessionRef: ctx.sessionManager?.getSessionFile?.(),
+			});
+			sideSessionRecords = { ...sideSessionRecords, [question.id]: record };
+			const choice = await chooseImport(record);
+			if (choice === "import") {
+				applySuggestion(record);
+			} else if (choice === "discard") {
+				sideSessionRecords = { ...sideSessionRecords, [question.id]: undefined };
+			} else if (choice === "view") {
+				ctx.ui.notify(`${record.summary} (${record.childSessionRef})`, "info");
+			}
+			clampFocus();
+			refresh();
+		}
+
+		async function handleQuestionEnter(question: QuestionnaireQuestion) {
 			const rows = currentRows();
 			const row = rows[focusIndex];
 			if (!row) {
@@ -210,10 +310,13 @@ export async function runQuestionnaireBatch(
 				input = { questionId: question.id, field: "custom" };
 				startInput(editor, input, answers);
 				refresh();
+				return;
 			}
+
+			await openSideSession(question);
 		}
 
-		function handleInput(data: string) {
+		async function handleInput(data: string) {
 			if (input) {
 				if (matchesKey(data, Key.escape)) {
 					input = null;
@@ -260,7 +363,7 @@ export async function runQuestionnaireBatch(
 			if (matchesKey(data, Key.enter)) {
 				const question = currentQuestion();
 				if (question) {
-					handleQuestionEnter(question);
+					await handleQuestionEnter(question);
 				}
 				return;
 			}
@@ -325,10 +428,20 @@ export async function runQuestionnaireBatch(
 					return;
 				}
 
-				const customSelected = mode === "custom";
-				const customPrefix = customSelected ? theme.fg("success", "●") : theme.fg("dim", "○");
-				const customValue = answer?.customAnswer?.trim() || "Enter a custom answer";
-				add(`${prefix}${customPrefix} Custom answer: ${customValue}`);
+				if (row.kind === "custom") {
+					const customSelected = mode === "custom";
+					const customPrefix = customSelected ? theme.fg("success", "●") : theme.fg("dim", "○");
+					const customValue = answer?.customAnswer?.trim() || "Enter a custom answer";
+					add(`${prefix}${customPrefix} Custom answer: ${customValue}`);
+					return;
+				}
+
+				const record = sideSessionRecords[question.id];
+				const label = record ? "Replace side session…" : "Open side session";
+				add(`${prefix}${theme.fg("accent", "↗")} ${label}`);
+				if (record) {
+					add(`    ${theme.fg("muted", `Side session: ${record.summary} (${record.childSessionRef})`)}`);
+				}
 			});
 
 			if (input) {
@@ -428,6 +541,7 @@ export async function runQuestionnaireBatch(
 			contentText,
 			cancelled: true,
 			pendingReason: "cancelled",
+			sideSessionRecords: interaction.sideSessionRecords,
 		};
 	}
 
@@ -439,5 +553,6 @@ export async function runQuestionnaireBatch(
 		renderedLines: submission.renderedLines,
 		contentText: buildModelVisibleQuestionnaireSubmission(batch, submission.result),
 		cancelled: false,
+		sideSessionRecords: interaction.sideSessionRecords,
 	};
 }

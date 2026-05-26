@@ -1,0 +1,3 @@
+# Use interactive child pi sessions for questionnaire side sessions
+
+Questionnaire Side Sessions should run as temporary interactive pi child sessions opened from a source question, with the parent questionnaire blocked and restored after the child exits. We will first spike reuse of pi-interactive-shell from the maintainer source because its overlay/PTY behavior is complex and desirable to reuse; if no stable compatible API exists, the feature may implement a minimal local blocking child-pi launcher. Return suggestions are passed through a child-side `/grill-side-return` command that writes sidecar JSON, and the parent always asks the user before importing the suggestion.

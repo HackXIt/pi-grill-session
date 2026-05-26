@@ -12,6 +12,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "smoke:pi": "node ./scripts/smoke-pi-runtime.mjs",
+    "smoke:side-session": "node ./scripts/smoke-questionnaire-side-session.mjs",
     "ci": "npm test && npm run typecheck && npm run smoke:pi"
   },
   "peerDependencies": {
