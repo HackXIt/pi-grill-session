@@ -1,6 +1,6 @@
 ---
 name: grill-session-docs
-description: Interactive pi version of grill-with-docs: stress-test a plan against the project domain language, sharpen terminology, and update CONTEXT.md/ADRs as decisions crystallize. Use when the user wants to be grilled with domain documentation or ubiquitous-language updates.
+description: "Interactive pi version of grill-with-docs: stress-test a plan against the project domain language, sharpen terminology, and update CONTEXT.md/ADRs as decisions crystallize. Use when the user wants to be grilled with domain documentation or ubiquitous-language updates."
 ---
 
 Interview the user relentlessly about every aspect of the plan, design, or implementation approach until you reach shared understanding. Walk down each branch of the decision tree, resolving dependencies between decisions one-by-one. For each question or batch, provide your recommended answer.

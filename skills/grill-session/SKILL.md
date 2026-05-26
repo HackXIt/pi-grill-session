@@ -1,6 +1,6 @@
 ---
 name: grill-session
-description: Interactive pi version of grill-me: pressure-test a plan or design through frontier-based questionnaire batches until shared understanding is reached. Use when grill-session mode is activated, the user asks to be grilled on a design, or mentions "grill me".
+description: "Interactive pi version of grill-me: pressure-test a plan or design through frontier-based questionnaire batches until shared understanding is reached. Use when grill-session mode is activated, the user asks to be grilled on a design, or mentions \"grill me\"."
 ---
 
 Interview the user relentlessly about every aspect of the plan, design, or implementation approach until you reach shared understanding. Walk down each branch of the decision tree, resolving dependencies between decisions one-by-one. For each question or batch, provide your recommended answer.
