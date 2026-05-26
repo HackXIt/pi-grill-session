@@ -1,11 +1,13 @@
 ---
 name: grill-session
-description: Run an interactive grill session that pressure-tests a plan or design through frontier-based question batches until the decision tree is complete. Use when grill-session mode is activated or the user asks to be grilled on a design.
+description: Interactive pi version of grill-me: pressure-test a plan or design through frontier-based questionnaire batches until shared understanding is reached. Use when grill-session mode is activated, the user asks to be grilled on a design, or mentions "grill me".
 ---
 
 Interview the user relentlessly about every aspect of the plan, design, or implementation approach until you reach shared understanding. Walk down each branch of the decision tree, resolving dependencies between decisions one-by-one. For each question or batch, provide your recommended answer.
 
 If a question can be answered by exploring the codebase, explore the codebase instead.
+
+This is the regular grill-session skill. Do not maintain a glossary, CONTEXT.md, or ADRs here. Use `grill-session-docs` when the user wants domain-language documentation updated during the grill.
 
 ## Grill-session behavior
 

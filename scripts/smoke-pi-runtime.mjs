@@ -13,6 +13,7 @@ const result = spawnSync(
 	piCliPath,
 	[
 		"--offline",
+		"--no-extensions",
 		"--extension",
 		"./src/index.ts",
 		"--no-tools",
@@ -23,7 +24,6 @@ const result = spawnSync(
 		"json",
 		"--print",
 		"--no-session",
-		"/grill",
 		prompt,
 	],
 	{

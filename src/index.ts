@@ -6,16 +6,21 @@ import {
 } from "./activation";
 import {
 	activateGrillSession,
+	clearPendingQuestionnaireBatch,
 	completeGrillSession,
 	getActiveGrillSessionInstruction,
 	restoreGrillSessionState,
+	setPendingQuestionnaireBatch,
 	GRILL_SESSION_COMPLETION_MARKER,
 	GRILL_SESSION_STATE_ENTRY,
 	type GrillSessionState,
 } from "./grill-state";
+import { runQuestionnaireBatch } from "./questionnaire-runtime";
+import type { QuestionnaireToolHandlers } from "./questionnaire-tool";
 
 export const COMMAND_GRILL = "grill";
 export const COMMAND_GRILL_END = "grill-end";
+export const COMMAND_GRILL_REOPEN = "grill-reopen";
 export { SKILL_GRILL_SESSION };
 
 const CUSTOM_MESSAGE_TYPE = "grill-session";
@@ -33,13 +38,14 @@ function sameState(left: GrillSessionState, right: GrillSessionState): boolean {
 	return (
 		left.active === right.active &&
 		left.completed === right.completed &&
-		left.activationSource === right.activationSource
+		left.activationSource === right.activationSource &&
+		JSON.stringify(left.pendingBatch) === JSON.stringify(right.pendingBatch)
 	);
 }
 
-export async function loadQuestionnaireRuntime(pi: ExtensionAPI): Promise<void> {
+export async function loadQuestionnaireRuntime(pi: ExtensionAPI, handlers: QuestionnaireToolHandlers = {}): Promise<void> {
 	const module = await import("./questionnaire-tool");
-	module.registerQuestionnaireTool(pi);
+	module.registerQuestionnaireTool(pi, handlers);
 }
 
 export default function grillSessionExtension(pi: ExtensionAPI) {
@@ -47,12 +53,21 @@ export default function grillSessionExtension(pi: ExtensionAPI) {
 	let disabledForAutonomousKanbanRole = false;
 	let questionnaireRuntimeLoaded = false;
 
+	const questionnaireHandlers: QuestionnaireToolHandlers = {
+		onPendingBatch(pendingBatch) {
+			setState(setPendingQuestionnaireBatch(state, pendingBatch));
+		},
+		onQuestionnaireSubmitted() {
+			setState(clearPendingQuestionnaireBatch(state));
+		},
+	};
+
 	function ensureQuestionnaireRuntimeLoaded() {
 		if (questionnaireRuntimeLoaded || shouldSkipQuestionnaireRuntimeLoad() || disabledForAutonomousKanbanRole) {
 			return;
 		}
 		questionnaireRuntimeLoaded = true;
-		void loadQuestionnaireRuntime(pi).catch((error) => {
+		void loadQuestionnaireRuntime(pi, questionnaireHandlers).catch((error) => {
 			questionnaireRuntimeLoaded = false;
 			console.error("Failed to load questionnaire runtime", error);
 		});
@@ -111,6 +126,43 @@ export default function grillSessionExtension(pi: ExtensionAPI) {
 				display: true,
 				details: { kind: "completion-marker" },
 			});
+		},
+	});
+
+	pi.registerCommand(COMMAND_GRILL_REOPEN, {
+		description: "Reopen the last pending questionnaire batch",
+		handler: async (_args, ctx) => {
+			syncSessionMode(ctx);
+			if (disabledForAutonomousKanbanRole) {
+				return;
+			}
+			if (!state.pendingBatch) {
+				ctx.ui.notify("No pending questionnaire batch to reopen.", "warning");
+				return;
+			}
+
+			const outcome = await runQuestionnaireBatch(state.pendingBatch.batch, ctx);
+			if (outcome.status === "pending") {
+				setState(setPendingQuestionnaireBatch(state, { batch: outcome.batch, reason: outcome.pendingReason }));
+				pi.sendMessage({
+					customType: CUSTOM_MESSAGE_TYPE,
+					content: [{ type: "text", text: outcome.contentText }],
+					display: true,
+					details: { kind: "pending-batch-status", reason: outcome.pendingReason },
+				});
+				return;
+			}
+
+			setState(clearPendingQuestionnaireBatch(state));
+			pi.sendMessage(
+				{
+					customType: CUSTOM_MESSAGE_TYPE,
+					content: [{ type: "text", text: outcome.renderedLines.join("\n") }],
+					display: true,
+					details: { kind: "pending-batch-submission" },
+				},
+				{ triggerTurn: true },
+			);
 		},
 	});
 

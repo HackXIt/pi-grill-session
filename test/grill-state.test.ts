@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { normalizeQuestionnaireBatch } from "../src/domain";
 import {
 	activateGrillSession,
 	completeGrillSession,
@@ -31,13 +32,41 @@ describe("grill session state", () => {
 	});
 
 	it("restores the latest state from branch-local custom entries", () => {
+		const pendingBatch = normalizeQuestionnaireBatch({
+			questions: [
+				{
+					id: "color",
+					label: "Color",
+					prompt: "Pick a color",
+					options: [
+						{ id: "red", label: "Red" },
+						{ id: "blue", label: "Blue" },
+					],
+				},
+			],
+		});
 		const restored = restoreGrillSessionState([
 			{ type: "custom", customType: GRILL_SESSION_STATE_ENTRY, data: { active: true, activationSource: "plain-text", completed: false } },
 			{ type: "message", message: { role: "user", content: "branch divergence" } },
-			{ type: "custom", customType: GRILL_SESSION_STATE_ENTRY, data: { active: false, activationSource: "plain-text", completed: true } },
+			{
+				type: "custom",
+				customType: GRILL_SESSION_STATE_ENTRY,
+				data: {
+					active: true,
+					activationSource: "plain-text",
+					completed: false,
+					pendingBatch: { batch: pendingBatch, reason: "cancelled" },
+				},
+			},
 		]);
 
 		expect(restored).toEqual({
+			active: true,
+			activationSource: "plain-text",
+			completed: false,
+			pendingBatch: { batch: pendingBatch, reason: "cancelled" },
+		});
+		expect(completeGrillSession(restored)).toEqual({
 			active: false,
 			activationSource: "plain-text",
 			completed: true,

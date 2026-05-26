@@ -38,6 +38,12 @@ Current commands:
 
 - `/grill`
 - `/grill-end`
+- `/grill-reopen` — reopens the last cancelled or no-UI questionnaire batch
+
+## Skills
+
+- `grill-session` — regular interactive grill-me flow using pi questionnaires.
+- `grill-session-docs` — grill-with-docs flow that also maintains ubiquitous-language `CONTEXT.md` documentation and offers ADRs sparingly.
 
 ## Verify the repo baseline
 
@@ -57,7 +63,7 @@ npm run smoke:pi
 Equivalent direct smoke command:
 
 ```bash
-PI_OFFLINE=1 npm exec -- pi --extension ./src/index.ts --no-tools --no-skills --append-system-prompt "Call the questionnaire tool immediately. Do not use any other tools. Do not read files. Do not ask follow-up questions before calling the questionnaire tool." --mode json --print --no-session "/grill" "Use the questionnaire tool right now to ask one question with two options: red and blue. Then tell me what happened."
+PI_OFFLINE=1 npm exec -- pi --no-extensions --extension ./src/index.ts --no-tools --no-skills --append-system-prompt "Call the questionnaire tool immediately. Do not use any other tools. Do not read files. Do not ask follow-up questions before calling the questionnaire tool." --mode json --print --no-session "Use the questionnaire tool right now to ask one question with two options: red and blue. Then tell me what happened."
 ```
 
 ## CI

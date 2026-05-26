@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import extension, { COMMAND_GRILL, COMMAND_GRILL_END } from "../src/index";
+import { normalizeQuestionnaireBatch } from "../src/domain";
+import extension, { COMMAND_GRILL, COMMAND_GRILL_END, COMMAND_GRILL_REOPEN } from "../src/index";
 import { GRILL_SESSION_COMPLETION_MARKER, GRILL_SESSION_STATE_ENTRY } from "../src/grill-state";
 
 type CommandHandler = (args: string, ctx: any) => Promise<void>;
@@ -66,7 +67,7 @@ describe("grill-session extension", () => {
 	it("registers grill commands and lifecycle handlers", () => {
 		const { commands, events } = createPiDouble();
 
-		expect(Array.from(commands.keys())).toEqual([COMMAND_GRILL, COMMAND_GRILL_END]);
+		expect(Array.from(commands.keys())).toEqual([COMMAND_GRILL, COMMAND_GRILL_END, COMMAND_GRILL_REOPEN]);
 		expect(Array.from(events.keys())).toEqual([
 			"input",
 			"session_start",
@@ -95,12 +96,38 @@ describe("grill-session extension", () => {
 		expect(sendUserMessage).toHaveBeenNthCalledWith(2, "/skill:grill-session");
 	});
 
-	it("marks the session completed and emits the visible completion marker", async () => {
-		const { commands, appendEntry, sendMessage } = createPiDouble();
-		const start = commands.get(COMMAND_GRILL)!;
+	it("marks the session completed, clears pending state, and emits the visible completion marker", async () => {
+		const { commands, appendEntry, sendMessage, events } = createPiDouble();
+		const pendingBatch = normalizeQuestionnaireBatch({
+			questions: [
+				{
+					id: "color",
+					label: "Color",
+					prompt: "Pick a color",
+					options: [
+						{ id: "red", label: "Red" },
+						{ id: "blue", label: "Blue" },
+					],
+				},
+			],
+		});
 		const end = commands.get(COMMAND_GRILL_END)!;
 
-		await start("", createCommandContext());
+		await events.get("session_start")!(
+			{},
+			createSessionContext([
+				{
+					type: "custom",
+					customType: GRILL_SESSION_STATE_ENTRY,
+					data: {
+						active: true,
+						activationSource: "command",
+						completed: false,
+						pendingBatch: { batch: pendingBatch, reason: "cancelled" },
+					},
+				},
+			]),
+		);
 		await end("", createCommandContext());
 
 		expect(appendEntry).toHaveBeenLastCalledWith(GRILL_SESSION_STATE_ENTRY, {
@@ -210,6 +237,74 @@ describe("grill-session extension", () => {
 			]),
 		);
 		await expect(beforeAgentStart({ systemPrompt: "base prompt" }, createSessionContext())).resolves.toBeUndefined();
+	});
+
+	it("reopens the last pending batch and clears pending metadata after submission", async () => {
+		const { commands, appendEntry, sendMessage, events } = createPiDouble();
+		const pendingBatch = normalizeQuestionnaireBatch({
+			title: "Recovery batch",
+			questions: [
+				{
+					id: "color",
+					label: "Color",
+					prompt: "Pick a color",
+					options: [
+						{ id: "red", label: "Red" },
+						{ id: "blue", label: "Blue" },
+					],
+				},
+			],
+		});
+		const reopen = commands.get(COMMAND_GRILL_REOPEN)!;
+		const notify = vi.fn();
+		const custom = vi.fn().mockResolvedValue({
+			cancelled: false,
+			answers: {
+				color: { questionId: "color", selectedOptionId: "red" },
+			},
+		});
+
+		await events.get("session_start")!(
+			{},
+			createSessionContext([
+				{
+					type: "custom",
+					customType: GRILL_SESSION_STATE_ENTRY,
+					data: {
+						active: true,
+						activationSource: "command",
+						completed: false,
+						pendingBatch: { batch: pendingBatch, reason: "cancelled" },
+					},
+				},
+			]),
+		);
+
+		await reopen(
+			"",
+			createCommandContext({
+				hasUI: true,
+				ui: { notify, confirm: vi.fn(), custom },
+			}),
+		);
+
+		expect(appendEntry).toHaveBeenLastCalledWith(GRILL_SESSION_STATE_ENTRY, {
+			active: true,
+			activationSource: "command",
+			completed: false,
+		});
+		expect(sendMessage).toHaveBeenCalledWith(
+			{
+				customType: "grill-session",
+				content: [
+					{ type: "text", text: "Questionnaire submitted: Recovery batch\n- Color: selected red — Red" },
+				],
+				display: true,
+				details: { kind: "pending-batch-submission" },
+			},
+			{ triggerTurn: true },
+		);
+		expect(notify).not.toHaveBeenCalled();
 	});
 
 	it("stays fully inert in autonomous kanban role sessions", async () => {

@@ -32,7 +32,8 @@
       "./src/index.ts"
     ],
     "skills": [
-      "./skills/grill-session"
+      "./skills/grill-session",
+      "./skills/grill-session-docs"
     ]
   }
 }
