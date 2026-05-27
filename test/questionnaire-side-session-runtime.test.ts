@@ -143,6 +143,39 @@ describe("questionnaire side-session runtime", () => {
 		expect(done).not.toHaveBeenCalled();
 	});
 
+	it("handles the default import choice inside the questionnaire UI after a side session returns", async () => {
+		const done = vi.fn();
+		let component: any;
+		const sideRecord = record({
+			suggestion: { mode: "option", questionId: "scope", selectedOptionId: "minimal", notes: "Keep it small." },
+		});
+		await runQuestionnaireBatch(batchInput, {
+			hasUI: true,
+			cwd: "/repo/project",
+			ui: {
+				custom: vi.fn().mockImplementation((build) => {
+					component = build(tui, theme, undefined, done);
+					return Promise.resolve({ cancelled: true, answers: {}, sideSessionRecords: {} });
+				}),
+				select: vi.fn(() => {
+					throw new Error("nested select should not be used from the questionnaire component");
+				}),
+			},
+		} as never, { sideSessions: { launch: vi.fn().mockResolvedValue(sideRecord) } });
+
+		await component.handleInput(DOWN);
+		await component.handleInput(ENTER);
+		expect(component.render(80).join("\n")).toContain("Import suggestion");
+
+		await component.handleInput(DOWN);
+		await component.handleInput(ENTER);
+
+		const rendered = component.render(80).join("\n");
+		expect(rendered).toContain("● Minimal");
+		expect(rendered).toContain("Notes: Keep it small.");
+		expect(done).not.toHaveBeenCalled();
+	});
+
 	it("asks for confirmation before replacing an existing side-session record", async () => {
 		let component: any;
 		const launch = vi.fn().mockResolvedValue(record({ id: "side-2", summary: "Replacement." }));

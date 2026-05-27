@@ -32,6 +32,11 @@ interface InputState {
 	field: "notes" | "custom";
 }
 
+interface SideSessionImportPromptState {
+	record: SideSessionRecord;
+	choiceIndex: number;
+}
+
 export interface PendingQuestionnaireOutcome {
 	status: "pending";
 	batch: QuestionnaireBatch;
@@ -153,6 +158,7 @@ export async function runQuestionnaireBatch(
 		let answers: QuestionnaireDraftAnswers = {};
 		let sideSessionRecords: Record<string, SideSessionRecord | undefined> = {};
 		let input: InputState | null = null;
+		let sideSessionImportPrompt: SideSessionImportPromptState | null = null;
 		let cachedLines: string[] | undefined;
 
 		const editorTheme: EditorTheme = {
@@ -212,27 +218,13 @@ export async function runQuestionnaireBatch(
 			done({ cancelled, answers, sideSessionRecords });
 		}
 
-		async function chooseImport(record: SideSessionRecord): Promise<SideSessionImportChoice> {
-			if (options.sideSessions?.chooseImport) {
-				return options.sideSessions.chooseImport(record);
-			}
-			const choices = [
-				"Return manually",
-				...(record.suggestion ? ["Import suggestion"] : []),
-				"View record",
-				"Discard record",
+		function importChoices(record: SideSessionRecord): { label: string; value: SideSessionImportChoice }[] {
+			return [
+				{ label: "Return manually", value: "manual" },
+				...(record.suggestion ? [{ label: "Import suggestion", value: "import" as const }] : []),
+				{ label: "View record", value: "view" },
+				{ label: "Discard record", value: "discard" },
 			];
-			const choice = await ctx.ui.select(`Side session returned: ${record.summary} (${record.childSessionRef})`, choices);
-			if (choice === "Import suggestion") {
-				return "import";
-			}
-			if (choice === "View record") {
-				return "view";
-			}
-			if (choice === "Discard record") {
-				return "discard";
-			}
-			return "manual";
 		}
 
 		async function confirmReplace(record: SideSessionRecord): Promise<boolean> {
@@ -253,6 +245,16 @@ export async function runQuestionnaireBatch(
 			answers = selectQuestionOption(batch, answers, record.suggestion.questionId, record.suggestion.selectedOptionId);
 			if (record.suggestion.notes) {
 				answers = setQuestionNotes(batch, answers, record.suggestion.questionId, record.suggestion.notes);
+			}
+		}
+
+		function applyImportChoice(record: SideSessionRecord, choice: SideSessionImportChoice) {
+			if (choice === "import") {
+				applySuggestion(record);
+			} else if (choice === "discard") {
+				sideSessionRecords = { ...sideSessionRecords, [record.sourceQuestionId]: undefined };
+			} else if (choice === "view") {
+				ctx.ui.notify(`${record.summary} (${record.childSessionRef})`, "info");
 			}
 		}
 
@@ -283,13 +285,10 @@ export async function runQuestionnaireBatch(
 				terminalTui.requestRender(true);
 			}
 			sideSessionRecords = { ...sideSessionRecords, [question.id]: record };
-			const choice = await chooseImport(record);
-			if (choice === "import") {
-				applySuggestion(record);
-			} else if (choice === "discard") {
-				sideSessionRecords = { ...sideSessionRecords, [question.id]: undefined };
-			} else if (choice === "view") {
-				ctx.ui.notify(`${record.summary} (${record.childSessionRef})`, "info");
+			if (options.sideSessions?.chooseImport) {
+				applyImportChoice(record, await options.sideSessions.chooseImport(record));
+			} else {
+				sideSessionImportPrompt = { record, choiceIndex: 0 };
 			}
 			clampFocus();
 			refresh();
@@ -329,6 +328,34 @@ export async function runQuestionnaireBatch(
 		}
 
 		async function handleInput(data: string) {
+			if (sideSessionImportPrompt) {
+				const choices = importChoices(sideSessionImportPrompt.record);
+				if (matchesKey(data, Key.up)) {
+					sideSessionImportPrompt.choiceIndex = Math.max(0, sideSessionImportPrompt.choiceIndex - 1);
+					refresh();
+					return;
+				}
+				if (matchesKey(data, Key.down)) {
+					sideSessionImportPrompt.choiceIndex = Math.min(choices.length - 1, sideSessionImportPrompt.choiceIndex + 1);
+					refresh();
+					return;
+				}
+				if (matchesKey(data, Key.enter)) {
+					const record = sideSessionImportPrompt.record;
+					const choice = choices[sideSessionImportPrompt.choiceIndex]?.value ?? "manual";
+					sideSessionImportPrompt = null;
+					applyImportChoice(record, choice);
+					clampFocus();
+					refresh();
+					return;
+				}
+				if (matchesKey(data, Key.escape)) {
+					sideSessionImportPrompt = null;
+					refresh();
+				}
+				return;
+			}
+
 			if (input) {
 				if (matchesKey(data, Key.escape)) {
 					input = null;
@@ -476,6 +503,20 @@ export async function runQuestionnaireBatch(
 			}
 		}
 
+		function renderSideSessionImportPrompt(width: number, lines: string[], prompt: SideSessionImportPromptState) {
+			const add = (text: string = "") => pushWrappedQuestionnaireLine(lines, text, width);
+			add();
+			add(theme.fg("accent", `Side session returned: ${prompt.record.summary}`));
+			add(theme.fg("muted", ` ${prompt.record.childSessionRef}`));
+			add();
+			importChoices(prompt.record).forEach((choice, index) => {
+				const prefix = index === prompt.choiceIndex ? theme.fg("accent", "> ") : "  ";
+				add(`${prefix}${choice.label}`);
+			});
+			add();
+			add(theme.fg("dim", " ↑↓ select • Enter confirm • Esc return manually"));
+		}
+
 		function renderSubmitView(width: number, lines: string[]) {
 			const add = (text: string = "") => pushWrappedQuestionnaireLine(lines, text, width);
 			add(theme.fg("accent", "Ready to submit"));
@@ -526,8 +567,12 @@ export async function runQuestionnaireBatch(
 				}
 			}
 
+			if (sideSessionImportPrompt) {
+				renderSideSessionImportPrompt(width, lines, sideSessionImportPrompt);
+			}
+
 			add();
-			if (!input) {
+			if (!input && !sideSessionImportPrompt) {
 				add(theme.fg("dim", " Tab/←→ navigate • ↑↓ select • Enter confirm/edit • Esc cancel"));
 			}
 			add(theme.fg("accent", "─".repeat(width)));
