@@ -41,7 +41,7 @@ Add per-question Side Sessions to the questionnaire UI. A Side Session is an int
 
 ## Return suggestion protocol
 
-The child pi session loads this extension and exposes three return paths:
+The child pi session loads this extension and, because side-session environment variables are present, exposes three return paths:
 
 - `grill_side_return_option` for selected option + optional notes suggestions
 - `grill_side_return_custom` for custom answer suggestions
@@ -53,6 +53,8 @@ All return paths write the same sidecar JSON shape:
 - source question id
 - answer mode: selected option plus optional notes, or custom answer
 - child/session reference fields inferred by the parent where available
+
+Outside questionnaire side sessions, these return paths are not registered by the extension. If a return writer is invoked directly without side-session environment, it fails with an explanatory error instead of writing a suggestion.
 
 If no sidecar JSON exists after child exit, the Import Dialog falls back to manual return and record viewing.
 
@@ -88,6 +90,8 @@ The launcher boundary is intentionally small so it can be replaced with a stable
 - [x] Parent questionnaire state is restored after child exit.
 - [x] Child-side `/grill-side-return` writes a valid sidecar suggestion.
 - [x] Child-side split tools write valid selected-option and custom-answer sidecar suggestions.
+- [x] Side-return command/tools are only registered inside questionnaire side sessions, with a hard-error fallback if invoked without side-session environment.
+- [x] Side-session prompt and runtime registration prevent nested grill-session activation inside side sessions.
 - [x] Parent Import Dialog can import selected option + optional notes or custom answer into the source question draft.
 - [x] Import never submits the batch automatically.
 - [x] Source question stores and displays a Side Session Record summary/reference.

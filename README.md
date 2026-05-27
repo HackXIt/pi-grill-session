@@ -46,7 +46,7 @@ pi -e git:github.com/HackXIt/pi-grill-session
 - `/grill` — start or continue an interactive grill session.
 - `/grill-end` — end the active grill session and emit `[GRILL SESSION COMPLETE]`.
 - `/grill-reopen` — reopen the last cancelled or no-UI questionnaire batch.
-- `/grill-side-return` — child-side interactive command used inside a side session to write an importable return suggestion.
+- `/grill-side-return` — child-side interactive command available only inside a questionnaire side session to write an importable return suggestion.
 
 ## Tools
 
@@ -54,7 +54,7 @@ pi -e git:github.com/HackXIt/pi-grill-session
 - `grill_side_return_option` — child-side side-session tool that returns a selected option suggestion plus optional notes.
 - `grill_side_return_custom` — child-side side-session tool that returns a custom-answer suggestion.
 
-The side-session return tools and `/grill-side-return` only write a suggestion for the parent questionnaire. They never submit the parent batch; the parent UI asks before importing.
+The side-session return tools and `/grill-side-return` are only registered inside questionnaire side sessions. If a return surface is invoked without side-session environment, it fails with an explanatory error. Return suggestions never submit the parent batch; the parent UI asks before importing.
 
 ## Questionnaire side sessions
 
@@ -65,7 +65,7 @@ Interactive questionnaire question tabs include an **Open side session** action.
 - the parent working directory and session branch reference when available
 - a temporary sidecar path for return suggestions
 
-The child prompt instructs the child session to treat the parent project as read-only by instruction, discuss the question first, and only return a suggestion after explicit user confirmation. When the child exits, the parent questionnaire resumes and shows an import prompt with manual return, import suggestion, view record, and discard choices.
+The child prompt instructs the child session to treat the parent project as read-only by instruction, discuss the question first, avoid nested grill sessions/questionnaires, and only return a suggestion after explicit user confirmation. When the child exits, the parent questionnaire resumes and shows an import prompt with manual return, import suggestion, view record, and discard choices.
 
 Side sessions are UI-only. In no-UI questionnaire fallback paths, the batch remains pending and can be recovered with `/grill-reopen`; no side-session launcher is offered.
 

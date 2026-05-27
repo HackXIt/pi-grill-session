@@ -41,8 +41,8 @@ A concrete draft answer payload produced by a child-side return tool or `/grill-
 _Avoid_: automatic answer, final submission, rich third answer mode
 
 **Side Session Return Surface**:
-The child-side mechanisms that write a Return Suggestion for the parent questionnaire: `grill_side_return_option`, `grill_side_return_custom`, or the interactive `/grill-side-return` command. These surfaces require explicit user confirmation in the child and never submit the parent questionnaire.
-_Avoid_: parent submit command, automatic import tool
+The child-side mechanisms that write a Return Suggestion for the parent questionnaire: `grill_side_return_option`, `grill_side_return_custom`, or the interactive `/grill-side-return` command. These surfaces are registered only in questionnaire side-session environments, require explicit user confirmation in the child, and never submit the parent questionnaire.
+_Avoid_: parent submit command, automatic import tool, global return command
 
 **Side Session Record**:
 A persisted reference to the current Side Session for a Source Question that keeps a concise summary plus enough transcript/session identity for the user to read the helper conversation again from that question tab; each Source Question has at most one record in an unsubmitted batch, and replacement requires confirmation.
