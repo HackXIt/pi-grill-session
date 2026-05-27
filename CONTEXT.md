@@ -25,8 +25,8 @@ The per-question questionnaire row that opens a Side Session for the active Sour
 _Avoid_: global escape, hidden shortcut, grill-only affordance
 
 **Side Session Overlay**:
-An external terminal-style overlay, preferably reusing pi-interactive-shell if a stable compatible API exists, that runs an interactive pi child session while the parent questionnaire remains blocked and recoverable; it is unavailable in no-UI questionnaire fallback paths.
-_Avoid_: inline panel, modal chat, headless helper, unresearched launcher fork
+A blocking child-`pi` process launched from the questionnaire after the parent TUI is temporarily suspended; it runs an interactive helper conversation while the parent questionnaire remains blocked and recoverable, then resumes the parent TUI after child exit. It is unavailable in no-UI questionnaire fallback paths.
+_Avoid_: inline panel, modal chat, headless helper, headless side session
 
 **Project Read-Only Mode**:
 A Side Session constraint where the child starts in the parent project and may inspect project files but must not mutate files in that project; mutations outside the project remain allowed under normal pi tool rules.
@@ -37,8 +37,12 @@ The user-selected way a Side Session affects the Source Question after the helpe
 _Avoid_: auto-submit, handoff
 
 **Return Suggestion**:
-A concrete draft answer payload produced by the child-side `/grill-side-return` command into a sidecar JSON file and shown to the user before changing the Source Question draft; it matches the existing answer model exactly: selected option plus optional notes, or custom answer.
+A concrete draft answer payload produced by a child-side return tool or `/grill-side-return` command into a sidecar JSON file and shown to the user before changing the Source Question draft; it matches the existing answer model exactly: selected option plus optional notes, or custom answer.
 _Avoid_: automatic answer, final submission, rich third answer mode
+
+**Side Session Return Surface**:
+The child-side mechanisms that write a Return Suggestion for the parent questionnaire: `grill_side_return_option`, `grill_side_return_custom`, or the interactive `/grill-side-return` command. These surfaces require explicit user confirmation in the child and never submit the parent questionnaire.
+_Avoid_: parent submit command, automatic import tool
 
 **Side Session Record**:
 A persisted reference to the current Side Session for a Source Question that keeps a concise summary plus enough transcript/session identity for the user to read the helper conversation again from that question tab; each Source Question has at most one record in an unsubmitted batch, and replacement requires confirmation.

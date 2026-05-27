@@ -17,6 +17,7 @@ Add per-question Side Sessions to the interactive questionnaire UI so users can 
 - Current lane: 0-open
 - Order: n/a
 - Owner: unassigned
+- Implementation status: code and documentation are implemented on `main`; lane movement remains a separate kanban housekeeping action.
 
 ## References
 
@@ -31,23 +32,24 @@ Add per-question Side Sessions to the interactive questionnaire UI so users can 
 
 ## Acceptance Criteria
 
-- [ ] Interactive questionnaires show a per-question Side Session Action.
-- [ ] Opening the action launches an interactive pi child session with the source question, current batch context, current draft answer, and current parent session branch reference.
-- [ ] The child is instructed to summarize relevant context first and respect Project Read-Only Mode for the parent project.
-- [ ] Parent questionnaire state is blocked and restored after the child exits.
-- [ ] The same extension is loaded in the child and exposes `/grill-side-return` to write sidecar JSON.
-- [ ] Parent reads a valid sidecar Return Suggestion after child exit.
-- [ ] Import Dialog lets the user manually return, import suggestion, view record, or discard.
-- [ ] Import supports only existing answer shapes: selected option + optional notes, or custom answer.
-- [ ] Import changes only the source question draft and never submits the batch.
-- [ ] Each source question has at most one current Side Session Record; replacement requires confirmation.
-- [ ] No-UI questionnaire fallback remains unchanged and does not offer Side Sessions.
+- [x] Interactive questionnaires show a per-question Side Session Action.
+- [x] Opening the action launches an interactive pi child session with the source question, current batch context, current draft answer, and current parent session branch reference.
+- [x] The child is instructed to summarize relevant context first and respect Project Read-Only Mode for the parent project.
+- [x] Parent questionnaire state is blocked and restored after the child exits.
+- [x] The same extension is loaded in the child and exposes `/grill-side-return` to write sidecar JSON.
+- [x] The same extension exposes split child-side return tools: `grill_side_return_option` and `grill_side_return_custom`.
+- [x] Parent reads a valid sidecar Return Suggestion after child exit.
+- [x] Import Dialog lets the user manually return, import suggestion, view record, or discard.
+- [x] Import supports only existing answer shapes: selected option + optional notes, or custom answer.
+- [x] Import changes only the source question draft and never submits the batch.
+- [x] Each source question has at most one current Side Session Record; replacement requires confirmation.
+- [x] No-UI questionnaire fallback remains unchanged and does not offer Side Sessions.
 
 ## Verification
 
 - `npm test`
 - `npm run typecheck`
-- scripted interactive pi smoke test covering launch, exit, import, view record, replacement confirmation, and no-UI fallback
+- `npm run smoke:side-session` manual interactive checklist covering launch, exit, import, view record, replacement confirmation, and no-UI fallback
 
 ## Notes
 
@@ -70,3 +72,4 @@ Keep v1 launcher scope intentionally small: interactive blocking child pi only; 
 
 - created from grill-session design
 - updated with `KB-0013` spike outcome: use a minimal local blocking launcher for v1
+- documented implemented v1 behavior, split side-return tools, and manual side-session smoke coverage

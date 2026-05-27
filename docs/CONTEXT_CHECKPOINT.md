@@ -1,248 +1,113 @@
 # Context Checkpoint
 
-Last updated: 2026-04-08
+Last updated: 2026-05-27
 
 ## Goal
 
-Build a new pi extension/skill that improves `grill-me` by replacing serial Q&A with an interactive multi-tab questionnaire flow.
+Build and maintain a pi extension/skill that improves `grill-me` by replacing serial Q&A with interactive multi-tab questionnaire batches. The extension keeps grill-session mode active until the decision tree is complete and returns structured answers to the model.
 
-The interactive flow should:
-- run automatically for the full grill session
-- collect each frontier batch before the agent continues
-- use pi’s TUI
-- preserve readable answers in chat history
-- return actual structured answers to the model
-
-## Constraints and Preferences
-
-- All `grill-me` interactions should be interactive in pi’s TUI.
-- Questionnaire must support:
-  - default answer options from the agent
-  - a recommended option marker
-  - a freeform/custom answer path
-  - option selection plus optional notes
-- User wants to answer all questions in a batch first; only then should the agent continue.
-- This behavior should persist until the grill decision tree is complete.
-- Follow-up clarification rounds should use the same interactive prompt style.
-- Automatic opening is preferred once a grill session is active; manual fallback must exist.
-- User may start grill sessions at conversation start or later after research; they do not want to manually open questionnaires every round.
-- Answers should be visible in chat history in readable form.
-- The model should receive the actual answers, not just a prose summary.
-- Activation should support explicit commands/skills and strong plain-text trigger matches.
-- Completion should use a dedicated completion tool and a strict user-visible marker phrase.
-- Important design decisions should be persisted somewhere useful, often markdown in the repo.
-- V1 should include repo + README + package + working CI/consumption path.
-- Automated tests are required for logic and acceptance-criteria-driven behavior; exploratory manual testing happens in pi.
-- Post-v1 work should be tracked as local file issues using pi-kanban; only epic-level post-v1 items go to GitLab.
-
-## Research Completed
-
-The following local pi docs/examples were reviewed:
-- `~/.pi/agent/skills/grill-me/SKILL.md`
-- `.../docs/extensions.md`
-- `.../docs/sdk.md`
-- `.../docs/tui.md`
-- `.../examples/extensions/README.md`
-- `.../examples/extensions/question.ts`
-- `.../examples/extensions/questionnaire.ts`
-- `.../examples/rpc-extension-ui.ts`
-- `.../pi-kanban/README.md`
-- `.../pi-kanban/skills/kanban/SKILL.md`
-
-Key result:
-- `examples/extensions/questionnaire.ts` is the closest existing interaction model and should be reused conceptually rather than rebuilt from scratch.
-
-## Prototype History
-
-Prototype extension path:
-- `~/.pi/agent/extensions/grill-prototype.ts`
-
-Supporting prototype data:
-- `/home/hackxit/git-stash/tmp/grill-batch3.json`
-
-Prototype commands:
-- `/grill-prototype`
-- `/grill-prototype batch2`
-- `/grill-prototype-file path/to/questions.json`
-
-Prototype currently demonstrates:
-- custom TUI questionnaire opening
-- built-in multiple batches
-- JSON-driven questionnaires
-- synthetic answer submission via `pi.sendUserMessage(...)`
-
-Prototype limitation:
-- it does **not** yet implement the final production payload/flow model.
-
-## Key Design Decisions
-
-### Interaction model
-- Use an extension, not only a skill.
-- Keep `grill-me` behavior interactive in pi’s TUI.
-- Use frontier-based batching: ask one batch per current decision frontier, wait for submission, then continue.
-- The primary mechanism should be an automatic custom-tool-driven questionnaire.
-- Manual commands must exist as fallback.
-
-### Activation
-Support all of:
-- explicit `/skill:grill-me`
-- alias like `/grill`
-- strong plain-text “grill me” detection
-
-Plain-text behavior:
-- strong match auto-activates
-- ambiguous match asks for confirmation
-
-### Skill strategy
-- Add a companion skill named `grill-session`.
-- Do not replace `grill-me` immediately.
-- Merge/replace later only if the new flow proves successful.
-
-### Questionnaire UX
-Each question must support:
-- predefined options
-- recommendation visibility on the option and in question/header context
-- fully custom answers
-- selected option + optional notes on the same tab
-
-### Answer model
-- The model must receive the actual answers in structured form.
-- Readable chat rendering is also required for user history/debuggability.
-
-### Session behavior
-- Once activated, grill mode remains active until completion.
-- Follow-up clarification rounds use the same questionnaire style.
-- File-based questionnaire loading was only for prototyping, not final UX.
-
-### Completion
-- Use a dedicated completion tool.
-- Also emit a strict visible marker phrase.
-- Manual `/grill-end` must exist.
-
-### Persistence
-- Important design decisions/results should be persisted to useful markdown files in the repo when needed.
-
-### Packaging and repo strategy
-- Use both local extension usage and a dedicated GitLab repo from day one.
-- V1 must include package metadata, README, and working CI/consumption path.
-
-### Testing bar
-- Add unit/integration automation for stable logic.
-- Validate interactive behavior exploratorily inside pi via `/reload`.
-
-### Backlog strategy
-- Track post-v1 work in local pi-kanban files.
-- Only epic-level future work should be promoted to GitLab.
-
-## Current Repository
+## Current repository
 
 Repo root:
-- `/home/hackxit/git-stash/pi-grill-session`
 
-This repository now contains:
-- `.plans/ARCHITECTURE.md`
-- `.plans/IMPLEMENTATION_PLAN.md`
-- `.kanban/` lane structure and tickets
-- `README.md`
-- `package.json`
-- `tsconfig.json`
-- `src/index.ts`
-- `src/domain.ts`
-- `test/index.test.ts`
-- `test/domain.test.ts`
+- `/home/hackxit/git-stash/mirror-personal/pi-grill-session.git/main`
 
-## Current Kanban State
+Important files:
 
-Completed:
-- `KB-0001` bootstrap repo and kanban
-- `KB-0002` extension skeleton and test harness
-- `KB-0003` questionnaire domain and payloads
+- `README.md` — usage, commands, tools, side-session UX, and verification.
+- `CONTEXT.md` — project ubiquitous language.
+- `docs/PRD-questionnaire-side-sessions.md` — implemented side-session PRD.
+- `docs/spike-questionnaire-side-sessions-interactive-shell-reuse.md` — launcher reuse spike.
+- `docs/adr/0001-questionnaire-side-sessions-use-interactive-child-pi.md` — side-session launcher decision.
+- `src/index.ts` — extension entrypoint and commands.
+- `src/questionnaire-tool.ts` — `questionnaire` tool registration.
+- `src/questionnaire-runtime.ts` — questionnaire TUI, pending behavior, side-session import flow.
+- `src/side-session/*` — context packaging, launcher, return suggestions, return tools/command.
+- `skills/grill-session/SKILL.md` and `skills/grill-session-docs/SKILL.md` — packaged skills.
 
-Refine next:
-- `KB-0004` build interactive questionnaire UI
-- `KB-0005` activation, state, and completion flow
+## Implemented behavior
 
-Open post-v1 backlog:
-- `KB-0006` generic interview framework
-- `KB-0007` non-grill skill support
-- `KB-0008` release/distribution hardening
+### Grill activation and lifecycle
 
-## Implemented So Far
+- `/grill` starts or continues grill-session mode.
+- Strong plain-text “grill me” activation is normalized into the canonical skill command.
+- Ambiguous “grill” messages ask for confirmation.
+- `/grill-end` ends the session and emits `[GRILL SESSION COMPLETE]`.
+- Autonomous kanban role sessions skip questionnaire/grill runtime loading; `kanban operator` remains allowed by skill guidance because it is user-owned and interactive.
 
-### Extension skeleton
-`src/index.ts` currently provides minimal command registration for:
-- `/grill`
-- `/grill-end`
+### Questionnaire tool
 
-This is a skeleton only, not the final integrated behavior.
+The `questionnaire` tool:
 
-### Questionnaire domain model
-`src/domain.ts` currently implements pure logic for:
-- questionnaire batch normalization
-- default labels (`Q1`, `Q2`, ...)
-- default `allowCustomAnswer = true`
-- default `allowNotes = false`
-- recommendation normalization
-- structured answer payload creation
-- option selection with optional notes
-- fully custom answers
-- readable summary line creation
+- opens an interactive multi-tab TUI when UI is attached
+- asks one batch at a time and waits for the full batch before the agent continues
+- supports options, recommended markers, option notes, and custom answers
+- renders readable chat history and returns structured answer details
+- records pending batches when cancelled or when no UI is attached
+- supports `/grill-reopen` for pending cancelled/no-UI batches
 
-### Tests
-Current passing tests cover:
-- command registration
-- question normalization defaults
-- structured payload shaping for option + notes
-- structured payload shaping for custom answers
+### Questionnaire side sessions
 
-Latest verification status:
-- `npm test` passing
+Interactive question tabs include an **Open side session** action.
 
-## Important Runtime / Environment Notes
+V1 side sessions:
 
-- Real prototype verification must happen inside pi; standalone verification outside pi previously failed because module resolution did not match pi runtime.
-- A prior observed error outside pi was:
-  - `Error: Cannot find module '@mariozechner/pi-tui'`
-- The original working directory before repo creation was not a git repo.
-- `kanban setup` partially failed in this environment due to a helper asset path issue (`cp: cannot stat '/home/hackxit/.local/README.md'`), so the missing seed files were repaired manually while preserving the expected pi-kanban structure.
+- suspend the parent questionnaire TUI before launching the child
+- launch a normal blocking child `pi` process in the parent project
+- write a context package with source question, full batch context, current draft answers, parent cwd, parent session reference, and sidecar return path
+- instruct the child to discuss first, respect instruction-only Project Read-Only Mode for the parent project, and only return after explicit user confirmation
+- resume the parent questionnaire after child exit, including failure handling
+- show an import prompt with manual return, import suggestion, view record, and discard choices
+- import only existing answer shapes: selected option + optional notes, or custom answer
+- never submit the parent questionnaire automatically
+- keep at most one current Side Session Record per source question and ask before replacement
 
-## Recommended Next Steps
+Child-side return surfaces:
 
-1. Implement `KB-0004`:
-   - real interactive questionnaire UI
-   - recommendation marker
-   - selected option + optional notes on same tab
-   - custom answer path
-   - full-batch submission flow
-2. Implement `KB-0005`:
-   - grill session state
-   - activation parsing/triggers
-   - completion tool contract
-   - strict completion marker phrase
-   - manual fallback commands
-3. Replace prototype-style `pi.sendUserMessage(...)` flow with real structured tool results plus readable rendering.
-4. Add companion skill:
-   - `skills/grill-session/SKILL.md`
-5. Add CI and finalize package/consumption path.
-6. Verify end-to-end behavior inside pi with `/reload`.
+- `grill_side_return_option`
+- `grill_side_return_custom`
+- `/grill-side-return`
 
-## Intended Production Module Layout
+The split tools replaced the earlier single-tool UX so model/tool routing is clearer for option vs custom returns. The interactive command reads side-session context so option ids can be selected from the source question.
 
-Proposed target structure:
-- `src/index.ts`
-- `src/questionnaire.ts`
-- `src/grill-state.ts`
-- `src/activation.ts`
-- `src/payload.ts`
-- `skills/grill-session/SKILL.md`
-- `tests/...`
+## Key design decisions
 
-## Resume Prompt for a New Agent Session
+- Use an extension plus companion skills, not a skill-only approach.
+- Keep grill sessions frontier-based: one current decision batch, then continue to the next unresolved frontier.
+- Prefer the `questionnaire` tool for batches whenever available.
+- Keep no-UI behavior recoverable rather than trying to run headless side sessions.
+- Use a local blocking child-`pi` launcher for side sessions in v1. The spike found useful side-conversation references but no stable compatible extension-to-extension launcher API.
+- Keep the side-session launcher boundary narrow so it can be swapped for a future upstream API.
+- Treat Project Read-Only Mode as instruction-only in v1.
+- Store side-session return data in sidecar JSON and always ask before importing.
 
-If resuming from this folder, the next agent should:
-- read `.plans/ARCHITECTURE.md`
-- read `.plans/IMPLEMENTATION_PLAN.md`
-- read `.kanban/README.md`
-- inspect current lane files in `.kanban/`
-- continue with `KB-0004` using TDD
-- preserve the design decisions listed above
+## Verification
+
+Automated baseline:
+
+```bash
+npm test
+npm run typecheck
+npm run smoke:pi
+```
+
+Manual interactive side-session checklist:
+
+```bash
+npm run smoke:side-session
+```
+
+`smoke:side-session` is intentionally a printed manual checklist because it requires a real interactive pi TUI/PTY session.
+
+## Backlog notes
+
+Kanban remains under `.kanban/`. Current side-session work is reflected in the PRD, spike, ADR, code, tests, and README. Future candidates include release/distribution hardening, generic interview framework extraction, and non-grill skill support.
+
+## Resume prompt for a new agent session
+
+If resuming documentation or implementation from this folder:
+
+1. Read `README.md`, `CONTEXT.md`, and `docs/PRD-questionnaire-side-sessions.md`.
+2. Inspect `src/questionnaire-runtime.ts` and `src/side-session/*` for side-session behavior.
+3. Run `npm test`, `npm run typecheck`, and `npm run smoke:pi` after code changes.
+4. Use `npm run smoke:side-session` for the manual interactive side-session checklist.
