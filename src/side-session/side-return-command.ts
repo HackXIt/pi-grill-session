@@ -98,6 +98,7 @@ export function registerGrillSideReturnCommand(pi: Pick<ExtensionAPI, "registerC
 				"utf8",
 			);
 			ctx.ui.notify(`Wrote side-session return suggestion to ${returnPath}`, "info");
+			ctx.shutdown();
 		},
 	});
 }

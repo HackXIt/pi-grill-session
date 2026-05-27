@@ -63,7 +63,8 @@ describe("side-session context package", () => {
 
 		expect(prompt).toContain("/grill-side-return");
 		expect(prompt).toContain("/tmp/grill-side-return.json");
-		expect(prompt).toContain("returning a suggestion never submits the parent questionnaire");
+		expect(prompt).toContain("returning a suggestion shuts down this side session but never submits the parent questionnaire");
+		expect(prompt).toContain('/grill-side-return {"summary":"Compared options."');
 	});
 
 	it("includes Project Read-Only Mode instructions", () => {

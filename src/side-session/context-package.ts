@@ -99,8 +99,9 @@ export function buildSideSessionPrompt(contextPackage: SideSessionContextPackage
 		"First summarize relevant context, then help the user answer the source question.",
 		"Parent project is in Project Read-Only Mode by instruction: inspect files but do not mutate files in the parent project.",
 		"Use /grill-side-return to write an importable suggestion if the user wants one.",
-		"Valid return shapes are selected option plus optional notes, or custom answer.",
-		"returning a suggestion never submits the parent questionnaire; the parent will ask before importing it.",
+		"Example: /grill-side-return {\"summary\":\"Compared options.\",\"answer\":{\"mode\":\"option\",\"selectedOptionId\":\"option-id\",\"notes\":\"Optional rationale.\"}}",
+		"Valid return shapes are selected option plus optional notes, or custom answer with a non-empty summary.",
+		"returning a suggestion shuts down this side session but never submits the parent questionnaire; the parent will ask before importing it.",
 		`Sidecar return path: ${contextPackage.sidecarReturnPath}`,
 	];
 

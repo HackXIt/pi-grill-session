@@ -41,11 +41,12 @@ describe("/grill-side-return command", () => {
 		);
 	});
 
-	it("writes a valid option sidecar", async () => {
+	it("writes a valid option sidecar and shuts down the child session", async () => {
 		const dir = await mkdtemp(join(tmpdir(), "grill-side-command-"));
 		process.env.GRILL_SIDE_RETURN_PATH = join(dir, "return.json");
 		process.env.GRILL_SIDE_SOURCE_QUESTION_ID = "scope";
 		const notify = vi.fn();
+		const shutdown = vi.fn();
 		const { pi, commands } = createPiDouble();
 		registerGrillSideReturnCommand(pi as never);
 		try {
@@ -54,7 +55,7 @@ describe("/grill-side-return command", () => {
 					summary: "Compared scope options.",
 					answer: { mode: "option", selectedOptionId: "minimal", notes: "Small slice" },
 				}),
-				{ ui: { notify }, sessionManager: { getSessionFile: () => "/tmp/child.jsonl" } },
+				{ ui: { notify }, sessionManager: { getSessionFile: () => "/tmp/child.jsonl" }, shutdown },
 			);
 
 			expect(JSON.parse(await readFile(process.env.GRILL_SIDE_RETURN_PATH, "utf8"))).toEqual({
@@ -64,6 +65,7 @@ describe("/grill-side-return command", () => {
 				answer: { mode: "option", questionId: "scope", selectedOptionId: "minimal", notes: "Small slice" },
 			});
 			expect(notify).toHaveBeenCalledWith(expect.stringContaining(process.env.GRILL_SIDE_RETURN_PATH), "info");
+			expect(shutdown).toHaveBeenCalledTimes(1);
 		} finally {
 			await rm(dir, { recursive: true, force: true });
 		}
@@ -78,7 +80,7 @@ describe("/grill-side-return command", () => {
 		try {
 			await commands.get(COMMAND_GRILL_SIDE_RETURN)!(
 				JSON.stringify({ summary: "Drafted custom.", answer: { mode: "custom", customAnswer: "Something else" } }),
-				{ ui: { notify: vi.fn() }, sessionManager: {} },
+				{ ui: { notify: vi.fn() }, sessionManager: {}, shutdown: vi.fn() },
 			);
 
 			expect(JSON.parse(await readFile(process.env.GRILL_SIDE_RETURN_PATH, "utf8"))).toMatchObject({
