@@ -108,7 +108,7 @@ export function buildSideSessionPrompt(contextPackage: SideSessionContextPackage
 		"Parent project is in Project Read-Only Mode by instruction: inspect files but do not mutate files in the parent project.",
 		"Do not return an answer immediately. First discuss the question with the user.",
 		"Only return a suggestion after the user explicitly confirms they want to return/import/finalize it; if they say no, continue this side-session conversation.",
-		"When confirmed, use the grill_side_return tool or the interactive /grill-side-return command to write an importable suggestion.",
+		"When confirmed, use grill_side_return_option for a selected option, grill_side_return_custom for a custom answer, or the interactive /grill-side-return command to write an importable suggestion.",
 		"Valid return shapes are selected option plus optional notes, or custom answer with a non-empty summary.",
 		"returning a suggestion shuts down this side session but never submits the parent questionnaire; the parent will ask before importing it.",
 		`Sidecar return path: ${contextPackage.sidecarReturnPath}`,

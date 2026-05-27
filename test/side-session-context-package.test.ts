@@ -93,7 +93,8 @@ describe("side-session context package", () => {
 
 		expect(prompt).toContain("Do not return an answer immediately");
 		expect(prompt).toContain("Only return a suggestion after the user explicitly confirms");
-		expect(prompt).toContain("grill_side_return");
+		expect(prompt).toContain("grill_side_return_option");
+		expect(prompt).toContain("grill_side_return_custom");
 		expect(prompt).toContain("/grill-side-return");
 		expect(prompt).toContain("/tmp/grill-side-return.json");
 		expect(prompt).toContain("returning a suggestion shuts down this side session but never submits the parent questionnaire");

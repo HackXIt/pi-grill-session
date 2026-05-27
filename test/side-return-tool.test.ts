@@ -2,7 +2,11 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { registerGrillSideReturnTool, TOOL_GRILL_SIDE_RETURN } from "../src/side-session/side-return-tool";
+import {
+	registerGrillSideReturnTools,
+	TOOL_GRILL_SIDE_RETURN_CUSTOM,
+	TOOL_GRILL_SIDE_RETURN_OPTION,
+} from "../src/side-session/side-return-tool";
 
 type ToolExecute = (toolCallId: string, params: any, signal: any, onUpdate: any, ctx: any) => Promise<any>;
 
@@ -18,35 +22,33 @@ function createPiDouble() {
 	};
 }
 
-describe("grill_side_return tool", () => {
+describe("side-return tools", () => {
 	afterEach(() => {
 		delete process.env.GRILL_SIDE_RETURN_PATH;
 		delete process.env.GRILL_SIDE_SOURCE_QUESTION_ID;
 	});
 
-	it("registers the side-return tool", () => {
+	it("registers split side-return tools without the ambiguous legacy tool", () => {
 		const { pi, tools } = createPiDouble();
 
-		registerGrillSideReturnTool(pi as never);
+		registerGrillSideReturnTools(pi as never);
 
-		expect(tools.has(TOOL_GRILL_SIDE_RETURN)).toBe(true);
+		expect(Array.from(tools.keys())).toEqual([TOOL_GRILL_SIDE_RETURN_OPTION, TOOL_GRILL_SIDE_RETURN_CUSTOM]);
+		expect(tools.has("grill_side_return")).toBe(false);
 	});
 
-	it("writes a valid sidecar, derives session fields, and shuts down", async () => {
+	it("writes an option sidecar, derives session fields, and shuts down", async () => {
 		const dir = await mkdtemp(join(tmpdir(), "grill-side-tool-"));
 		process.env.GRILL_SIDE_RETURN_PATH = join(dir, "return.json");
 		process.env.GRILL_SIDE_SOURCE_QUESTION_ID = "scope";
 		const notify = vi.fn();
 		const shutdown = vi.fn();
 		const { pi, tools } = createPiDouble();
-		registerGrillSideReturnTool(pi as never);
+		registerGrillSideReturnTools(pi as never);
 		try {
-			const result = await tools.get(TOOL_GRILL_SIDE_RETURN)!.execute(
+			const result = await tools.get(TOOL_GRILL_SIDE_RETURN_OPTION)!.execute(
 				"tool-1",
-				{
-					summary: "Picked minimal.",
-					answer: { mode: "option", questionId: "scope", selectedOptionId: "minimal", notes: "Small slice" },
-				},
+				{ summary: "Picked minimal.", questionId: "scope", selectedOptionId: "minimal", notes: "Small slice" },
 				undefined,
 				undefined,
 				{ ui: { notify }, sessionManager: { getSessionFile: () => "/tmp/child.jsonl" }, shutdown },
@@ -66,17 +68,41 @@ describe("grill_side_return tool", () => {
 		}
 	});
 
+	it("writes a custom sidecar", async () => {
+		const dir = await mkdtemp(join(tmpdir(), "grill-side-tool-"));
+		process.env.GRILL_SIDE_RETURN_PATH = join(dir, "return.json");
+		process.env.GRILL_SIDE_SOURCE_QUESTION_ID = "scope";
+		const { pi, tools } = createPiDouble();
+		registerGrillSideReturnTools(pi as never);
+		try {
+			await tools.get(TOOL_GRILL_SIDE_RETURN_CUSTOM)!.execute(
+				"tool-1",
+				{ summary: "Custom.", customAnswer: "Something else" },
+				undefined,
+				undefined,
+				{ ui: { notify: vi.fn() }, shutdown: vi.fn() },
+			);
+
+			expect(JSON.parse(await readFile(process.env.GRILL_SIDE_RETURN_PATH, "utf8"))).toMatchObject({
+				summary: "Custom.",
+				answer: { mode: "custom", questionId: "scope", customAnswer: "Something else" },
+			});
+		} finally {
+			await rm(dir, { recursive: true, force: true });
+		}
+	});
+
 	it("rejects a mismatched answer question id", async () => {
 		const dir = await mkdtemp(join(tmpdir(), "grill-side-tool-"));
 		process.env.GRILL_SIDE_RETURN_PATH = join(dir, "return.json");
 		process.env.GRILL_SIDE_SOURCE_QUESTION_ID = "scope";
 		const { pi, tools } = createPiDouble();
-		registerGrillSideReturnTool(pi as never);
+		registerGrillSideReturnTools(pi as never);
 		try {
 			await expect(
-				tools.get(TOOL_GRILL_SIDE_RETURN)!.execute(
+				tools.get(TOOL_GRILL_SIDE_RETURN_CUSTOM)!.execute(
 					"tool-1",
-					{ summary: "Wrong question.", answer: { mode: "custom", questionId: "other", customAnswer: "Nope" } },
+					{ summary: "Wrong question.", questionId: "other", customAnswer: "Nope" },
 					undefined,
 					undefined,
 					{ ui: { notify: vi.fn() }, shutdown: vi.fn() },

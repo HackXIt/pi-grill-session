@@ -78,7 +78,7 @@ describe("grill-session extension", () => {
 			COMMAND_GRILL_END,
 			COMMAND_GRILL_REOPEN,
 		]);
-		expect(Array.from(tools.keys())).toContain("grill_side_return");
+		expect(Array.from(tools.keys())).toEqual(["grill_side_return_option", "grill_side_return_custom"]);
 		expect(Array.from(events.keys())).toEqual([
 			"input",
 			"session_start",
