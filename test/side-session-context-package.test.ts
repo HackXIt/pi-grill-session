@@ -26,6 +26,36 @@ const batch = normalizeQuestionnaireBatch({
 });
 
 describe("side-session context package", () => {
+	it("starts the prompt with a side-session title for the questionnaire and source question", () => {
+		const contextPackage = buildSideSessionContextPackage({
+			batch,
+			sourceQuestionId: "launcher",
+			sidecarReturnPath: "/tmp/return.json",
+		});
+
+		expect(buildSideSessionPrompt(contextPackage).split("\n")[0]).toBe("Side-Session: Architecture choice Launcher");
+	});
+
+	it("omits the questionnaire title from the side-session title when the batch is untitled", () => {
+		const untitledBatch = normalizeQuestionnaireBatch({
+			questions: [
+				{
+					id: "scope",
+					label: "Scope",
+					prompt: "Pick scope",
+					options: [{ id: "small", label: "Small" }],
+				},
+			],
+		});
+		const contextPackage = buildSideSessionContextPackage({
+			batch: untitledBatch,
+			sourceQuestionId: "scope",
+			sidecarReturnPath: "/tmp/return.json",
+		});
+
+		expect(buildSideSessionPrompt(contextPackage).split("\n")[0]).toBe("Side-Session: Scope");
+	});
+
 	it("builds a prompt with the source question and all options", () => {
 		const contextPackage = buildSideSessionContextPackage({
 			batch,

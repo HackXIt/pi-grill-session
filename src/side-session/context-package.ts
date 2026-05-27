@@ -93,8 +93,16 @@ function renderQuestion(question: SideSessionContextPackage["questions"][number]
 	return lines;
 }
 
+function buildSideSessionTitle(contextPackage: SideSessionContextPackage): string {
+	const parts = [contextPackage.batchTitle, contextPackage.sourceQuestion.label].filter(
+		(part): part is string => typeof part === "string" && part.trim().length > 0,
+	);
+	return `Side-Session: ${parts.join(" ")}`;
+}
+
 export function buildSideSessionPrompt(contextPackage: SideSessionContextPackage): string {
 	const lines: string[] = [
+		buildSideSessionTitle(contextPackage),
 		"You are in a temporary questionnaire Side Session.",
 		"First summarize relevant context, then help the user answer the source question.",
 		"Parent project is in Project Read-Only Mode by instruction: inspect files but do not mutate files in the parent project.",
