@@ -13,10 +13,14 @@ function createPiDouble() {
 	const appendEntry = vi.fn();
 	const sendUserMessage = vi.fn();
 	const sendMessage = vi.fn();
+	const tools = new Map<string, unknown>();
 
 	const pi = {
 		registerCommand(name: string, options: { handler: CommandHandler }) {
 			commands.set(name, options.handler);
+		},
+		registerTool(tool: { name: string }) {
+			tools.set(tool.name, tool);
 		},
 		on(name: string, handler: EventHandler) {
 			events.set(name, handler);
@@ -28,7 +32,7 @@ function createPiDouble() {
 
 	extension(pi as never);
 
-	return { commands, events, appendEntry, sendUserMessage, sendMessage };
+	return { commands, events, tools, appendEntry, sendUserMessage, sendMessage };
 }
 
 function createCommandContext(overrides: Record<string, unknown> = {}) {
@@ -65,8 +69,8 @@ describe("grill-session extension", () => {
 		vi.clearAllMocks();
 	});
 
-	it("registers grill commands and lifecycle handlers", () => {
-		const { commands, events } = createPiDouble();
+	it("registers grill commands, side-return tool, and lifecycle handlers", () => {
+		const { commands, events, tools } = createPiDouble();
 
 		expect(Array.from(commands.keys())).toEqual([
 			COMMAND_GRILL_SIDE_RETURN,
@@ -74,6 +78,7 @@ describe("grill-session extension", () => {
 			COMMAND_GRILL_END,
 			COMMAND_GRILL_REOPEN,
 		]);
+		expect(Array.from(tools.keys())).toContain("grill_side_return");
 		expect(Array.from(events.keys())).toEqual([
 			"input",
 			"session_start",

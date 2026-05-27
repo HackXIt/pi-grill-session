@@ -1,104 +1,203 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { Editor, Key, matchesKey, wrapTextWithAnsi, type EditorTheme } from "@earendil-works/pi-tui";
+import { writeSideSessionReturnSuggestion, type SideReturnInput } from "./side-return-writer";
 
 export const COMMAND_GRILL_SIDE_RETURN = "grill-side-return";
 
-interface SideReturnCommandArgs {
+type Field = "summary" | "selectedOptionId" | "customAnswer" | "notes";
+type Row = { kind: "mode"; mode: "option" | "custom" } | { kind: "field"; field: Field } | { kind: "submit" };
+
+interface SideReturnDraft {
+	mode: "option" | "custom";
 	summary: string;
-	answer:
-		| { mode: "option"; selectedOptionId: string; notes?: string }
-		| { mode: "custom"; customAnswer: string };
+	selectedOptionId: string;
+	customAnswer: string;
+	notes: string;
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
+function rowsFor(draft: SideReturnDraft): Row[] {
+	return [
+		{ kind: "mode", mode: "option" },
+		{ kind: "mode", mode: "custom" },
+		{ kind: "field", field: "summary" },
+		{ kind: "field", field: draft.mode === "option" ? "selectedOptionId" : "customAnswer" },
+		...(draft.mode === "option" ? ([{ kind: "field", field: "notes" }] as Row[]) : []),
+		{ kind: "submit" },
+	];
 }
 
-function parseArgs(args: string): SideReturnCommandArgs {
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(args || "{}");
-	} catch (error) {
-		throw new Error(`Invalid /grill-side-return JSON: ${(error as Error).message}`);
+function fieldLabel(field: Field): string {
+	return {
+		summary: "Summary",
+		selectedOptionId: "Selected option id",
+		customAnswer: "Custom answer",
+		notes: "Notes",
+	}[field];
+}
+
+function fieldValue(draft: SideReturnDraft, field: Field): string {
+	return draft[field];
+}
+
+function setFieldValue(draft: SideReturnDraft, field: Field, value: string): SideReturnDraft {
+	return { ...draft, [field]: value };
+}
+
+function canSubmit(draft: SideReturnDraft): boolean {
+	return Boolean(
+		draft.summary.trim() &&
+			(draft.mode === "option" ? draft.selectedOptionId.trim() : draft.customAnswer.trim()),
+	);
+}
+
+function draftToInput(draft: SideReturnDraft): SideReturnInput {
+	return draft.mode === "option"
+		? {
+				summary: draft.summary,
+				answer: {
+					mode: "option",
+					selectedOptionId: draft.selectedOptionId,
+					...(draft.notes.trim() ? { notes: draft.notes } : {}),
+				},
+			}
+		: { summary: draft.summary, answer: { mode: "custom", customAnswer: draft.customAnswer } };
+}
+
+async function collectSideReturnInput(ctx: ExtensionCommandContext): Promise<SideReturnInput | undefined> {
+	if (!ctx.hasUI) {
+		throw new Error("/grill-side-return interactive UI requires an attached UI");
 	}
-	if (!isObject(parsed) || typeof parsed.summary !== "string" || !parsed.summary.trim()) {
-		throw new Error("/grill-side-return requires a non-empty summary");
-	}
-	if (!isObject(parsed.answer)) {
-		throw new Error("/grill-side-return requires an answer object");
-	}
-	if (parsed.answer.mode === "option") {
-		if (typeof parsed.answer.selectedOptionId !== "string" || !parsed.answer.selectedOptionId.trim()) {
-			throw new Error("/grill-side-return option answer requires selectedOptionId");
-		}
-		return {
-			summary: parsed.summary.trim(),
-			answer: {
-				mode: "option",
-				selectedOptionId: parsed.answer.selectedOptionId.trim(),
-				...(typeof parsed.answer.notes === "string" && parsed.answer.notes.trim()
-					? { notes: parsed.answer.notes.trim() }
-					: {}),
+	const outcome = await ctx.ui.custom<{ cancelled: boolean; draft: SideReturnDraft }>((tui, theme, _kb, done) => {
+		let draft: SideReturnDraft = { mode: "option", summary: "", selectedOptionId: "", customAnswer: "", notes: "" };
+		let focusIndex = 0;
+		let inputField: Field | undefined;
+		let cachedLines: string[] | undefined;
+		const editorTheme: EditorTheme = {
+			borderColor: (text) => theme.fg("accent", text),
+			selectList: {
+				selectedPrefix: (text) => theme.fg("accent", text),
+				selectedText: (text) => theme.fg("accent", text),
+				description: (text) => theme.fg("muted", text),
+				scrollInfo: (text) => theme.fg("dim", text),
+				noMatch: (text) => theme.fg("warning", text),
 			},
 		};
-	}
-	if (parsed.answer.mode === "custom") {
-		if (typeof parsed.answer.customAnswer !== "string" || !parsed.answer.customAnswer.trim()) {
-			throw new Error("/grill-side-return custom answer requires customAnswer");
-		}
-		return {
-			summary: parsed.summary.trim(),
-			answer: { mode: "custom", customAnswer: parsed.answer.customAnswer.trim() },
-		};
-	}
-	throw new Error("/grill-side-return answer mode must be option or custom");
-}
+		const editor = new Editor(tui, editorTheme);
 
-function getChildSessionRef(ctx: Partial<ExtensionCommandContext>): string {
-	return ctx.sessionManager?.getSessionFile?.() ?? "child-pi-session";
+		function refresh() {
+			cachedLines = undefined;
+			tui.requestRender();
+		}
+
+		function clampFocus() {
+			focusIndex = Math.min(focusIndex, rowsFor(draft).length - 1);
+		}
+
+		editor.onSubmit = (value) => {
+			if (!inputField) return;
+			draft = setFieldValue(draft, inputField, value);
+			inputField = undefined;
+			editor.setText("");
+			refresh();
+		};
+
+		async function handleInput(data: string) {
+			if (inputField) {
+				if (matchesKey(data, Key.escape)) {
+					inputField = undefined;
+					editor.setText("");
+					refresh();
+					return;
+				}
+				editor.handleInput(data);
+				refresh();
+				return;
+			}
+			const rows = rowsFor(draft);
+			if (matchesKey(data, Key.up)) {
+				focusIndex = Math.max(0, focusIndex - 1);
+				refresh();
+				return;
+			}
+			if (matchesKey(data, Key.down)) {
+				focusIndex = Math.min(rows.length - 1, focusIndex + 1);
+				refresh();
+				return;
+			}
+			if (matchesKey(data, Key.escape)) {
+				done({ cancelled: true, draft });
+				return;
+			}
+			if (!matchesKey(data, Key.enter)) return;
+			const row = rows[focusIndex];
+			if (row.kind === "mode") {
+				draft = { ...draft, mode: row.mode };
+				clampFocus();
+				refresh();
+				return;
+			}
+			if (row.kind === "field") {
+				inputField = row.field;
+				editor.setText(fieldValue(draft, row.field));
+				refresh();
+				return;
+			}
+			if (canSubmit(draft)) {
+				done({ cancelled: false, draft });
+			}
+		}
+
+		function render(width: number): string[] {
+			if (cachedLines) return cachedLines;
+			const lines: string[] = [];
+			const add = (text = "") => lines.push(...wrapTextWithAnsi(text, Math.max(1, width)));
+			add(theme.fg("accent", "Return side-session answer"));
+			add(theme.fg("muted", "Write a suggestion to the parent questionnaire and close this side session."));
+			add();
+			rowsFor(draft).forEach((row, index) => {
+				const prefix = index === focusIndex ? theme.fg("accent", "> ") : "  ";
+				if (row.kind === "mode") {
+					add(`${prefix}${draft.mode === row.mode ? theme.fg("success", "●") : theme.fg("dim", "○")} ${row.mode === "option" ? "Selected option" : "Custom answer"}`);
+					return;
+				}
+				if (row.kind === "field") {
+					const value = fieldValue(draft, row.field).trim() || "Enter value";
+					add(`${prefix}${theme.fg("accent", "✎")} ${fieldLabel(row.field)}: ${value}`);
+					return;
+				}
+				add(`${prefix}${canSubmit(draft) ? theme.fg("success", "✓ Submit and return") : theme.fg("dim", "✓ Submit and return")}`);
+			});
+			if (inputField) {
+				add();
+				add(theme.fg("muted", ` Edit ${fieldLabel(inputField)}:`));
+				for (const line of editor.render(Math.max(1, width - 2))) add(` ${line}`);
+				add(theme.fg("dim", " Enter saves • Esc cancels"));
+			} else {
+				add();
+				add(theme.fg("dim", "↑↓ select • Enter edit/confirm • Esc cancel"));
+			}
+			cachedLines = lines;
+			return lines;
+		}
+
+		return { render, invalidate: () => (cachedLines = undefined), handleInput };
+	});
+	return outcome.cancelled ? undefined : draftToInput(outcome.draft);
 }
 
 export function registerGrillSideReturnCommand(pi: Pick<ExtensionAPI, "registerCommand">) {
 	pi.registerCommand(COMMAND_GRILL_SIDE_RETURN, {
-		description: "Write a questionnaire side-session return suggestion for the parent questionnaire.",
+		description: "Interactively return a questionnaire side-session answer suggestion.",
 		handler: async (args, ctx) => {
-			const returnPath = process.env.GRILL_SIDE_RETURN_PATH;
-			const sourceQuestionId = process.env.GRILL_SIDE_SOURCE_QUESTION_ID;
-			if (!returnPath || !sourceQuestionId) {
-				throw new Error("GRILL_SIDE_RETURN_PATH and GRILL_SIDE_SOURCE_QUESTION_ID must be set");
+			if (args.trim()) {
+				throw new Error("/grill-side-return is interactive. Run it without arguments and fill in the form.");
 			}
-			const parsed = parseArgs(args);
-			const answer =
-				parsed.answer.mode === "option"
-					? {
-							mode: "option" as const,
-							questionId: sourceQuestionId,
-							selectedOptionId: parsed.answer.selectedOptionId,
-							...(parsed.answer.notes ? { notes: parsed.answer.notes } : {}),
-					  }
-					: {
-							mode: "custom" as const,
-							questionId: sourceQuestionId,
-							customAnswer: parsed.answer.customAnswer,
-					  };
-			await mkdir(dirname(returnPath), { recursive: true });
-			await writeFile(
-				returnPath,
-				JSON.stringify(
-					{
-						sourceQuestionId,
-						summary: parsed.summary,
-						childSessionRef: getChildSessionRef(ctx),
-						answer,
-					},
-					null,
-					2,
-				),
-				"utf8",
-			);
-			ctx.ui.notify(`Wrote side-session return suggestion to ${returnPath}`, "info");
-			ctx.shutdown();
+			const input = await collectSideReturnInput(ctx);
+			if (!input) {
+				ctx.ui.notify("Side-session return cancelled", "info");
+				return;
+			}
+			await writeSideSessionReturnSuggestion(input, ctx);
 		},
 	});
 }

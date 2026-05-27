@@ -18,6 +18,10 @@ function createPiDouble() {
 	};
 }
 
+function customResult(draft: unknown) {
+	return vi.fn().mockResolvedValue({ cancelled: false, draft });
+}
+
 describe("/grill-side-return command", () => {
 	afterEach(() => {
 		delete process.env.GRILL_SIDE_RETURN_PATH;
@@ -32,16 +36,16 @@ describe("/grill-side-return command", () => {
 		expect(commands.has(COMMAND_GRILL_SIDE_RETURN)).toBe(true);
 	});
 
-	it("rejects when sidecar env vars are absent", async () => {
+	it("rejects non-interactive args", async () => {
 		const { pi, commands } = createPiDouble();
 		registerGrillSideReturnCommand(pi as never);
 
 		await expect(commands.get(COMMAND_GRILL_SIDE_RETURN)!("{}", { ui: { notify: vi.fn() } })).rejects.toThrow(
-			"GRILL_SIDE_RETURN_PATH",
+			"interactive",
 		);
 	});
 
-	it("writes a valid option sidecar and shuts down the child session", async () => {
+	it("writes a valid option sidecar from the interactive form and shuts down the child session", async () => {
 		const dir = await mkdtemp(join(tmpdir(), "grill-side-command-"));
 		process.env.GRILL_SIDE_RETURN_PATH = join(dir, "return.json");
 		process.env.GRILL_SIDE_SOURCE_QUESTION_ID = "scope";
@@ -50,13 +54,21 @@ describe("/grill-side-return command", () => {
 		const { pi, commands } = createPiDouble();
 		registerGrillSideReturnCommand(pi as never);
 		try {
-			await commands.get(COMMAND_GRILL_SIDE_RETURN)!(
-				JSON.stringify({
-					summary: "Compared scope options.",
-					answer: { mode: "option", selectedOptionId: "minimal", notes: "Small slice" },
-				}),
-				{ ui: { notify }, sessionManager: { getSessionFile: () => "/tmp/child.jsonl" }, shutdown },
-			);
+			await commands.get(COMMAND_GRILL_SIDE_RETURN)!("", {
+				hasUI: true,
+				ui: {
+					notify,
+					custom: customResult({
+						mode: "option",
+						summary: "Compared scope options.",
+						selectedOptionId: "minimal",
+						customAnswer: "",
+						notes: "Small slice",
+					}),
+				},
+				sessionManager: { getSessionFile: () => "/tmp/child.jsonl" },
+				shutdown,
+			});
 
 			expect(JSON.parse(await readFile(process.env.GRILL_SIDE_RETURN_PATH, "utf8"))).toEqual({
 				sourceQuestionId: "scope",
@@ -71,17 +83,28 @@ describe("/grill-side-return command", () => {
 		}
 	});
 
-	it("writes a valid custom sidecar", async () => {
+	it("writes a valid custom sidecar from the interactive form", async () => {
 		const dir = await mkdtemp(join(tmpdir(), "grill-side-command-"));
 		process.env.GRILL_SIDE_RETURN_PATH = join(dir, "return.json");
 		process.env.GRILL_SIDE_SOURCE_QUESTION_ID = "scope";
 		const { pi, commands } = createPiDouble();
 		registerGrillSideReturnCommand(pi as never);
 		try {
-			await commands.get(COMMAND_GRILL_SIDE_RETURN)!(
-				JSON.stringify({ summary: "Drafted custom.", answer: { mode: "custom", customAnswer: "Something else" } }),
-				{ ui: { notify: vi.fn() }, sessionManager: {}, shutdown: vi.fn() },
-			);
+			await commands.get(COMMAND_GRILL_SIDE_RETURN)!("", {
+				hasUI: true,
+				ui: {
+					notify: vi.fn(),
+					custom: customResult({
+						mode: "custom",
+						summary: "Drafted custom.",
+						selectedOptionId: "",
+						customAnswer: "Something else",
+						notes: "",
+					}),
+				},
+				sessionManager: {},
+				shutdown: vi.fn(),
+			});
 
 			expect(JSON.parse(await readFile(process.env.GRILL_SIDE_RETURN_PATH, "utf8"))).toMatchObject({
 				answer: { mode: "custom", questionId: "scope", customAnswer: "Something else" },
@@ -92,14 +115,26 @@ describe("/grill-side-return command", () => {
 		}
 	});
 
-	it("rejects malformed JSON args", async () => {
-		process.env.GRILL_SIDE_RETURN_PATH = "/tmp/return.json";
+	it("does not write or shut down when the interactive form is cancelled", async () => {
+		const dir = await mkdtemp(join(tmpdir(), "grill-side-command-"));
+		process.env.GRILL_SIDE_RETURN_PATH = join(dir, "return.json");
 		process.env.GRILL_SIDE_SOURCE_QUESTION_ID = "scope";
+		const notify = vi.fn();
+		const shutdown = vi.fn();
 		const { pi, commands } = createPiDouble();
 		registerGrillSideReturnCommand(pi as never);
+		try {
+			await commands.get(COMMAND_GRILL_SIDE_RETURN)!("", {
+				hasUI: true,
+				ui: { notify, custom: vi.fn().mockResolvedValue({ cancelled: true, draft: {} }) },
+				shutdown,
+			});
 
-		await expect(commands.get(COMMAND_GRILL_SIDE_RETURN)!("not json", { ui: { notify: vi.fn() } })).rejects.toThrow(
-			"JSON",
-		);
+			await expect(readFile(process.env.GRILL_SIDE_RETURN_PATH, "utf8")).rejects.toThrow("ENOENT");
+			expect(notify).toHaveBeenCalledWith("Side-session return cancelled", "info");
+			expect(shutdown).not.toHaveBeenCalled();
+		} finally {
+			await rm(dir, { recursive: true, force: true });
+		}
 	});
 });

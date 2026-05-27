@@ -82,7 +82,7 @@ describe("side-session context package", () => {
 		expect(buildSideSessionPrompt(contextPackage)).toContain("Current source draft: option child-pi; notes: Keep it blocking.");
 	});
 
-	it("includes the sidecar path and grill-side-return instructions", () => {
+	it("includes guarded side-return instructions", () => {
 		const contextPackage = buildSideSessionContextPackage({
 			batch,
 			sourceQuestionId: "launcher",
@@ -91,10 +91,12 @@ describe("side-session context package", () => {
 
 		const prompt = buildSideSessionPrompt(contextPackage);
 
+		expect(prompt).toContain("Do not return an answer immediately");
+		expect(prompt).toContain("Only return a suggestion after the user explicitly confirms");
+		expect(prompt).toContain("grill_side_return");
 		expect(prompt).toContain("/grill-side-return");
 		expect(prompt).toContain("/tmp/grill-side-return.json");
 		expect(prompt).toContain("returning a suggestion shuts down this side session but never submits the parent questionnaire");
-		expect(prompt).toContain('/grill-side-return {"summary":"Compared options."');
 	});
 
 	it("includes Project Read-Only Mode instructions", () => {
