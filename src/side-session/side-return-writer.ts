@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { getMissingSideSessionEnvironment } from "./environment";
 
 export type SideReturnInput = {
 	summary: string;
@@ -9,12 +10,17 @@ export type SideReturnInput = {
 		| { mode: "custom"; questionId?: string; customAnswer: string };
 };
 
-function getRequiredEnv(name: string): string {
-	const value = process.env[name];
-	if (!value) {
-		throw new Error("GRILL_SIDE_RETURN_PATH and GRILL_SIDE_SOURCE_QUESTION_ID must be set");
+function assertSideSessionEnvironment() {
+	const missing = getMissingSideSessionEnvironment();
+	if (missing.length > 0) {
+		throw new Error(
+			`Side-session return only works inside questionnaire side sessions; missing ${missing.join(", ")}`,
+		);
 	}
-	return value;
+}
+
+function getRequiredEnv(name: string): string {
+	return process.env[name]!;
 }
 
 function getChildSessionRef(ctx: Partial<ExtensionContext>): string {
@@ -56,6 +62,7 @@ function normalizeInput(input: SideReturnInput, sourceQuestionId: string): SideR
 }
 
 export async function writeSideSessionReturnSuggestion(input: SideReturnInput, ctx: Partial<ExtensionContext>) {
+	assertSideSessionEnvironment();
 	const returnPath = getRequiredEnv("GRILL_SIDE_RETURN_PATH");
 	const sourceQuestionId = getRequiredEnv("GRILL_SIDE_SOURCE_QUESTION_ID");
 	const normalized = normalizeInput(input, sourceQuestionId);

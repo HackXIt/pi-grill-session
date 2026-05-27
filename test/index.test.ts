@@ -73,18 +73,32 @@ describe("grill-session extension", () => {
 		const { commands, events, tools } = createPiDouble();
 
 		expect(Array.from(commands.keys())).toEqual([
-			COMMAND_GRILL_SIDE_RETURN,
 			COMMAND_GRILL,
 			COMMAND_GRILL_END,
 			COMMAND_GRILL_REOPEN,
 		]);
-		expect(Array.from(tools.keys())).toEqual(["grill_side_return_option", "grill_side_return_custom"]);
+		expect(Array.from(tools.keys())).toEqual([]);
 		expect(Array.from(events.keys())).toEqual([
 			"input",
 			"session_start",
 			"session_tree",
 			"before_agent_start",
 		]);
+	});
+
+	it("registers only side-return surfaces inside questionnaire side sessions", () => {
+		const previousEnv = { ...process.env };
+		process.env.GRILL_SIDE_RETURN_PATH = "/tmp/return.json";
+		process.env.GRILL_SIDE_SOURCE_QUESTION_ID = "q1";
+		try {
+			const { commands, events, tools } = createPiDouble();
+
+			expect(Array.from(commands.keys())).toEqual([COMMAND_GRILL_SIDE_RETURN]);
+			expect(Array.from(tools.keys())).toEqual(["grill_side_return_option", "grill_side_return_custom"]);
+			expect(Array.from(events.keys())).toEqual([]);
+		} finally {
+			process.env = previousEnv;
+		}
 	});
 
 	it("starts grill mode idempotently and routes through the canonical skill message", async () => {

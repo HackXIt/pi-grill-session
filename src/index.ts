@@ -17,6 +17,7 @@ import {
 } from "./grill-state";
 import { runQuestionnaireBatch } from "./questionnaire-runtime";
 import type { QuestionnaireToolHandlers } from "./questionnaire-tool";
+import { isQuestionnaireSideSessionEnvironment } from "./side-session/environment";
 import { registerGrillSideReturnCommand } from "./side-session/side-return-command";
 import { registerGrillSideReturnTools } from "./side-session/side-return-tool";
 
@@ -51,8 +52,11 @@ export async function loadQuestionnaireRuntime(pi: ExtensionAPI, handlers: Quest
 }
 
 export default function grillSessionExtension(pi: ExtensionAPI) {
-	registerGrillSideReturnCommand(pi);
-	registerGrillSideReturnTools(pi);
+	if (isQuestionnaireSideSessionEnvironment()) {
+		registerGrillSideReturnCommand(pi);
+		registerGrillSideReturnTools(pi);
+		return;
+	}
 
 	let state: GrillSessionState = restoreGrillSessionState([]);
 	let disabledForAutonomousKanbanRole = false;

@@ -105,6 +105,7 @@ export function buildSideSessionPrompt(contextPackage: SideSessionContextPackage
 		buildSideSessionTitle(contextPackage),
 		"You are in a temporary questionnaire Side Session.",
 		"First summarize relevant context, then help the user answer the source question.",
+		"This is already a helper side session: do not start grill-session mode, do not ask whether to start one, and do not run nested grill questionnaires. Help answer the source question only.",
 		"Parent project is in Project Read-Only Mode by instruction: inspect files but do not mutate files in the parent project.",
 		"Do not return an answer immediately. First discuss the question with the user.",
 		"Only return a suggestion after the user explicitly confirms they want to return/import/finalize it; if they say no, continue this side-session conversation.",

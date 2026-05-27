@@ -100,6 +100,17 @@ describe("side-session context package", () => {
 		expect(prompt).toContain("returning a suggestion shuts down this side session but never submits the parent questionnaire");
 	});
 
+	it("explicitly forbids nested grill sessions", () => {
+		const prompt = buildSideSessionPrompt(
+			buildSideSessionContextPackage({ batch, sourceQuestionId: "launcher", sidecarReturnPath: "/tmp/return.json" }),
+		);
+
+		expect(prompt).toContain("do not start grill-session mode");
+		expect(prompt).toContain("do not ask whether to start one");
+		expect(prompt).toContain("do not run nested grill questionnaires");
+		expect(prompt).toContain("Help answer the source question only");
+	});
+
 	it("includes Project Read-Only Mode instructions", () => {
 		const prompt = buildSideSessionPrompt(
 			buildSideSessionContextPackage({ batch, sourceQuestionId: "launcher", sidecarReturnPath: "/tmp/return.json" }),

@@ -37,6 +37,21 @@ describe("side-return tools", () => {
 		expect(tools.has("grill_side_return")).toBe(false);
 	});
 
+	it("fails clearly if executed outside a questionnaire side session", async () => {
+		const { pi, tools } = createPiDouble();
+		registerGrillSideReturnTools(pi as never);
+
+		await expect(
+			tools.get(TOOL_GRILL_SIDE_RETURN_CUSTOM)!.execute(
+				"tool-1",
+				{ summary: "Custom.", customAnswer: "Something else" },
+				undefined,
+				undefined,
+				{ ui: { notify: vi.fn() }, shutdown: vi.fn() },
+			),
+		).rejects.toThrow("only works inside questionnaire side sessions");
+	});
+
 	it("writes an option sidecar, derives session fields, and shuts down", async () => {
 		const dir = await mkdtemp(join(tmpdir(), "grill-side-tool-"));
 		process.env.GRILL_SIDE_RETURN_PATH = join(dir, "return.json");
