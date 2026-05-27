@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -26,6 +26,7 @@ describe("/grill-side-return command", () => {
 	afterEach(() => {
 		delete process.env.GRILL_SIDE_RETURN_PATH;
 		delete process.env.GRILL_SIDE_SOURCE_QUESTION_ID;
+		delete process.env.GRILL_SIDE_CONTEXT_PATH;
 	});
 
 	it("registers the command", () => {
@@ -49,6 +50,12 @@ describe("/grill-side-return command", () => {
 		const dir = await mkdtemp(join(tmpdir(), "grill-side-command-"));
 		process.env.GRILL_SIDE_RETURN_PATH = join(dir, "return.json");
 		process.env.GRILL_SIDE_SOURCE_QUESTION_ID = "scope";
+		process.env.GRILL_SIDE_CONTEXT_PATH = join(dir, "context.json");
+		await writeFile(
+			process.env.GRILL_SIDE_CONTEXT_PATH,
+			JSON.stringify({ sourceQuestion: { options: [{ id: "minimal", label: "Minimal" }] } }),
+			"utf8",
+		);
 		const notify = vi.fn();
 		const shutdown = vi.fn();
 		const { pi, commands } = createPiDouble();

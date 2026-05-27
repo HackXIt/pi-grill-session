@@ -1,6 +1,6 @@
-import { mkdir, mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { spawn } from "node:child_process";
 import type { QuestionnaireBatch } from "../domain";
 import type { QuestionnaireDraftAnswers } from "../questionnaire";
@@ -87,6 +87,8 @@ export async function launchQuestionnaireSideSession({
 		parentCwd: cwd,
 		parentSessionRef,
 	});
+	const contextPath = join(dirname(returnPath), "context.json");
+	await writeFile(contextPath, JSON.stringify(contextPackage, null, 2), "utf8");
 	const prompt = buildSideSessionPrompt(contextPackage);
 	const result = await runner({
 		command: "pi",
@@ -95,6 +97,7 @@ export async function launchQuestionnaireSideSession({
 		env: {
 			...process.env,
 			GRILL_SIDE_RETURN_PATH: returnPath,
+			GRILL_SIDE_CONTEXT_PATH: contextPath,
 			GRILL_SIDE_SOURCE_QUESTION_ID: sourceQuestionId,
 			GRILL_SIDE_PARENT_CWD: cwd,
 		},

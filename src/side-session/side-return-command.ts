@@ -1,11 +1,18 @@
+import { readFile } from "node:fs/promises";
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { Editor, Key, matchesKey, wrapTextWithAnsi, type EditorTheme } from "@earendil-works/pi-tui";
 import { writeSideSessionReturnSuggestion, type SideReturnInput } from "./side-return-writer";
 
 export const COMMAND_GRILL_SIDE_RETURN = "grill-side-return";
 
-type Field = "summary" | "selectedOptionId" | "customAnswer" | "notes";
-type Row = { kind: "mode"; mode: "option" | "custom" } | { kind: "field"; field: Field } | { kind: "submit" };
+type Field = "summary" | "customAnswer" | "notes";
+type SourceOption = { id: string; label: string; description?: string };
+type SideReturnContext = { sourceQuestion?: { options?: SourceOption[] } };
+type Row =
+	| { kind: "mode"; mode: "option" | "custom" }
+	| { kind: "field"; field: Field }
+	| { kind: "option"; option: SourceOption }
+	| { kind: "submit" };
 
 interface SideReturnDraft {
 	mode: "option" | "custom";
@@ -15,13 +22,16 @@ interface SideReturnDraft {
 	notes: string;
 }
 
-function rowsFor(draft: SideReturnDraft): Row[] {
+function rowsFor(draft: SideReturnDraft, options: SourceOption[]): Row[] {
+	const hasOptions = options.length > 0;
 	return [
-		{ kind: "mode", mode: "option" },
+		...(hasOptions ? ([{ kind: "mode", mode: "option" }] as Row[]) : []),
 		{ kind: "mode", mode: "custom" },
 		{ kind: "field", field: "summary" },
-		{ kind: "field", field: draft.mode === "option" ? "selectedOptionId" : "customAnswer" },
-		...(draft.mode === "option" ? ([{ kind: "field", field: "notes" }] as Row[]) : []),
+		...(draft.mode === "option" && hasOptions
+			? options.map((option): Row => ({ kind: "option", option }))
+			: ([{ kind: "field", field: "customAnswer" }] as Row[])),
+		...(draft.mode === "option" && hasOptions ? ([{ kind: "field", field: "notes" }] as Row[]) : []),
 		{ kind: "submit" },
 	];
 }
@@ -29,7 +39,7 @@ function rowsFor(draft: SideReturnDraft): Row[] {
 function fieldLabel(field: Field): string {
 	return {
 		summary: "Summary",
-		selectedOptionId: "Selected option id",
+
 		customAnswer: "Custom answer",
 		notes: "Notes",
 	}[field];
@@ -44,13 +54,13 @@ function setFieldValue(draft: SideReturnDraft, field: Field, value: string): Sid
 }
 
 function canSubmit(draft: SideReturnDraft): boolean {
-	return Boolean(
-		draft.summary.trim() &&
-			(draft.mode === "option" ? draft.selectedOptionId.trim() : draft.customAnswer.trim()),
-	);
+	return Boolean(draft.summary.trim() && (draft.mode === "option" ? draft.selectedOptionId.trim() : draft.customAnswer.trim()));
 }
 
-function draftToInput(draft: SideReturnDraft): SideReturnInput {
+function draftToInput(draft: SideReturnDraft, options: SourceOption[]): SideReturnInput {
+	if (draft.mode === "option" && !options.some((option) => option.id === draft.selectedOptionId)) {
+		throw new Error(`Unknown option id '${draft.selectedOptionId}' for source question`);
+	}
 	return draft.mode === "option"
 		? {
 				summary: draft.summary,
@@ -63,12 +73,28 @@ function draftToInput(draft: SideReturnDraft): SideReturnInput {
 		: { summary: draft.summary, answer: { mode: "custom", customAnswer: draft.customAnswer } };
 }
 
+async function loadSourceOptions(): Promise<SourceOption[]> {
+	const contextPath = process.env.GRILL_SIDE_CONTEXT_PATH;
+	if (!contextPath) return [];
+	const parsed = JSON.parse(await readFile(contextPath, "utf8")) as SideReturnContext;
+	return parsed.sourceQuestion?.options ?? [];
+}
+
 async function collectSideReturnInput(ctx: ExtensionCommandContext): Promise<SideReturnInput | undefined> {
 	if (!ctx.hasUI) {
 		throw new Error("/grill-side-return interactive UI requires an attached UI");
 	}
+	let options: SourceOption[] = [];
+	try {
+		options = await loadSourceOptions();
+	} catch (error) {
+		ctx.ui.notify(`Could not load side-session options; custom answer only: ${(error as Error).message}`, "warning");
+	}
+	if (options.length === 0) {
+		ctx.ui.notify("No side-session option context found; custom answer only.", "warning");
+	}
 	const outcome = await ctx.ui.custom<{ cancelled: boolean; draft: SideReturnDraft }>((tui, theme, _kb, done) => {
-		let draft: SideReturnDraft = { mode: "option", summary: "", selectedOptionId: "", customAnswer: "", notes: "" };
+		let draft: SideReturnDraft = { mode: options.length > 0 ? "option" : "custom", summary: "", selectedOptionId: "", customAnswer: "", notes: "" };
 		let focusIndex = 0;
 		let inputField: Field | undefined;
 		let cachedLines: string[] | undefined;
@@ -90,7 +116,7 @@ async function collectSideReturnInput(ctx: ExtensionCommandContext): Promise<Sid
 		}
 
 		function clampFocus() {
-			focusIndex = Math.min(focusIndex, rowsFor(draft).length - 1);
+			focusIndex = Math.min(focusIndex, rowsFor(draft, options).length - 1);
 		}
 
 		editor.onSubmit = (value) => {
@@ -113,7 +139,7 @@ async function collectSideReturnInput(ctx: ExtensionCommandContext): Promise<Sid
 				refresh();
 				return;
 			}
-			const rows = rowsFor(draft);
+			const rows = rowsFor(draft, options);
 			if (matchesKey(data, Key.up)) {
 				focusIndex = Math.max(0, focusIndex - 1);
 				refresh();
@@ -142,6 +168,11 @@ async function collectSideReturnInput(ctx: ExtensionCommandContext): Promise<Sid
 				refresh();
 				return;
 			}
+			if (row.kind === "option") {
+				draft = { ...draft, selectedOptionId: row.option.id };
+				refresh();
+				return;
+			}
 			if (canSubmit(draft)) {
 				done({ cancelled: false, draft });
 			}
@@ -154,7 +185,7 @@ async function collectSideReturnInput(ctx: ExtensionCommandContext): Promise<Sid
 			add(theme.fg("accent", "Return side-session answer"));
 			add(theme.fg("muted", "Write a suggestion to the parent questionnaire and close this side session."));
 			add();
-			rowsFor(draft).forEach((row, index) => {
+			rowsFor(draft, options).forEach((row, index) => {
 				const prefix = index === focusIndex ? theme.fg("accent", "> ") : "  ";
 				if (row.kind === "mode") {
 					add(`${prefix}${draft.mode === row.mode ? theme.fg("success", "●") : theme.fg("dim", "○")} ${row.mode === "option" ? "Selected option" : "Custom answer"}`);
@@ -163,6 +194,12 @@ async function collectSideReturnInput(ctx: ExtensionCommandContext): Promise<Sid
 				if (row.kind === "field") {
 					const value = fieldValue(draft, row.field).trim() || "Enter value";
 					add(`${prefix}${theme.fg("accent", "✎")} ${fieldLabel(row.field)}: ${value}`);
+					return;
+				}
+				if (row.kind === "option") {
+					const selected = draft.selectedOptionId === row.option.id;
+					add(`${prefix}${selected ? theme.fg("success", "●") : theme.fg("dim", "○")} ${row.option.id} — ${row.option.label}`);
+					if (row.option.description) add(`    ${theme.fg("muted", row.option.description)}`);
 					return;
 				}
 				add(`${prefix}${canSubmit(draft) ? theme.fg("success", "✓ Submit and return") : theme.fg("dim", "✓ Submit and return")}`);
@@ -182,7 +219,7 @@ async function collectSideReturnInput(ctx: ExtensionCommandContext): Promise<Sid
 
 		return { render, invalidate: () => (cachedLines = undefined), handleInput };
 	});
-	return outcome.cancelled ? undefined : draftToInput(outcome.draft);
+	return outcome.cancelled ? undefined : draftToInput(outcome.draft, options);
 }
 
 export function registerGrillSideReturnCommand(pi: Pick<ExtensionAPI, "registerCommand">) {

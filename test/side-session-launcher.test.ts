@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -34,14 +34,17 @@ describe("side-session launcher", () => {
 				expect.objectContaining({
 					command: "pi",
 					cwd: "/repo/project",
-					env: expect.objectContaining({
+						env: expect.objectContaining({
 						GRILL_SIDE_SOURCE_QUESTION_ID: "scope",
 						GRILL_SIDE_PARENT_CWD: "/repo/project",
+						GRILL_SIDE_CONTEXT_PATH: join(dir, "context.json"),
 					}),
 					prompt: expect.stringContaining("What should v1 include?"),
 				}),
 			);
 			expect(runner.mock.calls[0][0].env.GRILL_SIDE_RETURN_PATH).toContain("return.json");
+			const context = JSON.parse(await readFile(join(dir, "context.json"), "utf8"));
+			expect(context.sourceQuestion).toMatchObject({ id: "scope", label: "Scope" });
 		} finally {
 			await rm(dir, { recursive: true, force: true });
 		}
