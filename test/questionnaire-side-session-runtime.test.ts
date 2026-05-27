@@ -117,6 +117,36 @@ describe("questionnaire side-session runtime", () => {
 		expect(localTui.requestRender).toHaveBeenCalledWith(true);
 	});
 
+	it("shows a side-session error and stays on the same question when launch rejects", async () => {
+		const localTui = createTui();
+		const notify = vi.fn();
+		const launch = vi.fn().mockRejectedValue(new Error("Side-session return sidecar must include childSessionRef"));
+		let component: any;
+		await runQuestionnaireBatch(batchInput, {
+			hasUI: true,
+			cwd: "/repo/project",
+			ui: {
+				notify,
+				custom: vi.fn().mockImplementation((build) => {
+					component = build(localTui, theme, undefined, vi.fn());
+					return Promise.resolve({ cancelled: true, answers: {}, sideSessionRecords: {} });
+				}),
+			},
+		} as never, { sideSessions: { launch, chooseImport: vi.fn().mockResolvedValue("manual") } });
+
+		await component.handleInput(DOWN);
+		await expect(component.handleInput(ENTER)).resolves.toBeUndefined();
+
+		expect(localTui.start).toHaveBeenCalled();
+		expect(localTui.requestRender).toHaveBeenCalledWith(true);
+		expect(notify).toHaveBeenCalledWith(
+			"Side session failed: Side-session return sidecar must include childSessionRef",
+			"error",
+		);
+		expect(component.render(80).join("\n")).toContain("Open side session");
+		expect(component.render(80).join("\n")).not.toContain("Side session:");
+	});
+
 	it("imports an option suggestion into the draft but does not submit the batch", async () => {
 		const done = vi.fn();
 		let component: any;

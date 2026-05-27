@@ -280,6 +280,11 @@ export async function runQuestionnaireBatch(
 					answers,
 					parentSessionRef: ctx.sessionManager?.getSessionFile?.(),
 				});
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				ctx.ui.notify(`Side session failed: ${message}`, "error");
+				refresh();
+				return;
 			} finally {
 				terminalTui.start();
 				terminalTui.requestRender(true);
